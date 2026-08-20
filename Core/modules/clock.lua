@@ -1,12 +1,93 @@
-local AddOnName, XIVBar = ...;
+---@class XIVBar
+local XIVBar = select(2, ...);
 local _G = _G;
 local xb = XIVBar;
 local L = XIVBar.L;
 
 local ClockModule = xb:NewModule("ClockModule", 'AceEvent-3.0')
 
-local function GetServerTimeString(optFormat)
+local GetNumDayEvents = C_Calendar.GetNumDayEvents
+local GetHolidayInfo = C_Calendar.GetHolidayInfo
+local GetCurrentCalendarTime = C_DateAndTime.GetCurrentCalendarTime
+
+local function SnapToEvenPixel(value)
+    local snapped = floor((value or 0) + 0.5)
+    if snapped < 1 then
+        snapped = 1
+    end
+    if snapped % 2 ~= 0 then
+        snapped = snapped + 1
+    end
+    return snapped
+end
+
+function ClockModule:ApplyRestIconTexture()
+    if not self.restIcon or not self.restIconFrame then return end
+    local mode = xb.db.profile.modules.clock.restIconTextureMode or "default"
+    local custom = xb.db.profile.modules.clock.restIconCustomTexture
+    local size = xb.db.profile.modules.clock.restIconSize or 24
+    local useCustomColor = xb.db.profile.modules.clock.restIconUseCustomColor
+    local useClassColor = xb.db.profile.modules.clock.restIconUseClassColor
+    local color = xb.db.profile.modules.clock.restIconColor or { r = 1, g = 1, b = 1, a = 1 }
+    local elvuiRestIcons = nil
+    ---@diagnostic disable-next-line: undefined-field
+    if _G.ElvUI and _G.ElvUI[1] and _G.ElvUI[1].Media and _G.ElvUI[1].Media.RestIcons then
+        ---@diagnostic disable-next-line: undefined-field
+        elvuiRestIcons = _G.ElvUI[1].Media.RestIcons
+    end
+
+    if mode == "custom" and custom and custom:match("%S") then
+        self.restIcon:SetTexture(custom)
+        self.restIcon:SetTexCoord(0, 1, 0, 1)
+        self.restIcon:SetSize(size, size)
+    elseif elvuiRestIcons and elvuiRestIcons[mode] then
+        self.restIcon:SetTexture(elvuiRestIcons[mode])
+        self.restIcon:SetTexCoord(0, 1, 0, 1)
+        self.restIcon:SetSize(size, size)
+    else
+        -- default: atlas modern then fallback classic texture
+        if self.restIcon.SetAtlas and self.restIcon:SetAtlas("UI-HUD-UnitFrame-PlayerPortrait-Rest") then
+            self.restIcon:SetSize(size, size)
+            self.restIcon:SetTexCoord(0, 1, 0, 1)
+        else
+            self.restIcon:SetTexture("Interface\\CharacterFrame\\UI-StateIcon")
+            self.restIcon:SetTexCoord(0, 0.5, 0, 0.421875)
+            self.restIcon:SetSize(size, size)
+        end
+    end
+
+    if useCustomColor then
+        local r, g, b = color.r or 1, color.g or 1, color.b or 1
+        if useClassColor then
+            r, g, b = xb:GetClassColors()
+        end
+        self.restIcon:SetVertexColor(r, g, b, color.a or 1)
+        if self.restIcon.SetDesaturated then
+            self.restIcon:SetDesaturated(true)
+        end
+    else
+        self.restIcon:SetVertexColor(1, 1, 1, 1)
+        if self.restIcon.SetDesaturated then
+            self.restIcon:SetDesaturated(false)
+        end
+    end
+
+    self.restIconFrame:SetSize(self.restIcon:GetWidth(), self.restIcon:GetHeight())
+end
+
+local function GetServerTimeString(optFormat, calendarTime)
     local hour, minute = GetGameTime()
+    if calendarTime then
+        local constructedServerTime = time({
+            year = calendarTime and calendarTime.year or 1970,
+            month = calendarTime and calendarTime.month or 1,
+            day = calendarTime and calendarTime.monthDay or 2,
+            hour = calendarTime and calendarTime.hour or hour,
+            min = calendarTime and calendarTime.min or 0,
+            sec = 0
+        })
+        return date(ClockModule.timeFormats[optFormat], constructedServerTime)
+    end
     local constructedServerTime = time({
         year = 1970,
         month = 1,
@@ -16,6 +97,170 @@ local function GetServerTimeString(optFormat)
         sec = 0
     })
     return date(ClockModule.timeFormats[optFormat], constructedServerTime)
+end
+
+local function formatDateAndTime(dateText, timeText)
+    if not dateText then
+        return timeText
+    end
+    if not timeText then
+        return dateText
+    end
+    if COMMUNITIES_CALENDAR_EVENT_FORMAT then
+        return string.format(COMMUNITIES_CALENDAR_EVENT_FORMAT, dateText, timeText)
+    end
+    return dateText .. " " .. timeText
+end
+
+local function FormatCalendarDateTime(calendarTime)
+    if not calendarTime then
+        return nil
+    end
+
+    local timeFormat = xb.db.profile.modules.clock.timeFormat
+    local dateText = xb:FormatLocalizedDate(calendarTime.monthDay, calendarTime.month)
+    local timeText = GetServerTimeString(timeFormat, calendarTime)
+    return formatDateAndTime(dateText, timeText)
+end
+
+local function FormatTimestampDateTime(timestamp)
+    if not timestamp then
+        return nil
+    end
+
+    local timeFormat = xb.db.profile.modules.clock.timeFormat
+    local truncated = math.ceil(timestamp / 60) * 60
+    local d = date("*t", truncated)
+    local dateText = xb:FormatLocalizedDate(d.day, d.month)
+    local timeText = date(ClockModule.timeFormats[timeFormat], truncated)
+    return formatDateAndTime(dateText, timeText)
+end
+
+local function FormatLockoutResetDateTime(resetAt)
+    if not resetAt or resetAt <= 0 then
+        return nil
+    end
+    return FormatTimestampDateTime(resetAt)
+end
+
+local function formatLockoutLabel(entry)
+    local difficultyName = entry.difficultyName
+    if difficultyName and difficultyName ~= "" then
+        return string.format("%s (%s)", entry.name, difficultyName)
+    end
+    return entry.name
+end
+
+local function getDifficultySortOrder(entry)
+    local orderById = {
+        [7] = 0,
+        [17] = 0,
+        [1] = 1,
+        [3] = 1,
+        [4] = 1,
+        [14] = 1,
+        [2] = 2,
+        [5] = 2,
+        [6] = 2,
+        [15] = 2,
+        [8] = 3,
+        [16] = 3,
+        [23] = 3,
+    }
+    local difficultyId = entry.difficultyId
+    if difficultyId and orderById[difficultyId] then
+        return orderById[difficultyId]
+    end
+
+    local difficultyName = entry.difficultyName and string.lower(entry.difficultyName) or ""
+    if difficultyName:find("mythic", 1, true) or difficultyName:find("mythique", 1, true) then
+        return 3
+    end
+    if difficultyName:find("heroic", 1, true) or difficultyName:find("héroïque", 1, true)
+        or difficultyName:find("heroique", 1, true) then
+        return 2
+    end
+    if difficultyName:find("normal", 1, true) then
+        return 1
+    end
+    if difficultyName:find("looking for raid", 1, true) or difficultyName:find("recherche", 1, true) then
+        return 0
+    end
+    return 99
+end
+
+local function sortLockouts(a, b)
+    local nameA = a.name or ""
+    local nameB = b.name or ""
+    if nameA ~= nameB then
+        return nameA < nameB
+    end
+
+    local orderA = getDifficultySortOrder(a)
+    local orderB = getDifficultySortOrder(b)
+    if orderA ~= orderB then
+        return orderA < orderB
+    end
+
+    return formatLockoutLabel(a) < formatLockoutLabel(b)
+end
+
+local function formatLockoutDetail(entry)
+    local parts = {}
+    local opts = xb.db.profile.modules.clock
+    if opts.showBossesKilledInLockouts ~= false
+        and entry.isRaid and entry.numEncounters and entry.numEncounters > 0 and BOSSES_KILLED then
+        parts[#parts + 1] = string.format(BOSSES_KILLED, entry.encounterProgress or 0, entry.numEncounters)
+    end
+    local resetText = FormatLockoutResetDateTime(entry.resetAt)
+    if resetText then
+        parts[#parts + 1] = resetText
+    end
+    return table.concat(parts, " - ")
+end
+
+local function collectSavedLockouts()
+    local raids = {}
+    local dungeons = {}
+    if not GetNumSavedInstances or not GetSavedInstanceInfo then
+        return raids, dungeons
+    end
+
+    for i = 1, GetNumSavedInstances() do
+        local name, _, reset, difficultyId, locked, _, _, isRaid, _, difficultyName, numEncounters, encounterProgress =
+            GetSavedInstanceInfo(i)
+        if locked and name then
+            local resetAt
+            if reset and reset > 0 and GetServerTime then
+                resetAt = math.ceil((GetServerTime() + reset) / 60) * 60
+            end
+            local entry = {
+                name = name,
+                isRaid = isRaid,
+                difficultyId = difficultyId,
+                difficultyName = difficultyName,
+                resetAt = resetAt,
+                numEncounters = numEncounters,
+                encounterProgress = encounterProgress,
+            }
+            if isRaid then
+                raids[#raids + 1] = entry
+            else
+                dungeons[#dungeons + 1] = entry
+            end
+        end
+    end
+
+    table.sort(raids, sortLockouts)
+    table.sort(dungeons, sortLockouts)
+    return raids, dungeons
+end
+
+function ClockModule:OnLeaveCombat()
+    if self.needsResize then
+        self.needsResize = false
+        self:Refresh()
+    end
 end
 
 function ClockModule:GetName()
@@ -54,6 +299,10 @@ function ClockModule:OnInitialize()
 
     self.elapsed = 0
 
+    self.instanceInfoReady = false
+    self.cachedLockoutsRaids = {}
+    self.cachedLockoutsDungeons = {}
+
     self.functions = {}
 end
 
@@ -64,53 +313,133 @@ function ClockModule:OnEnable()
     end
     self.clockFrame:Show()
     self.elapsed = 0
+    self.needsResize = false
     self:CreateFrames()
     self:CreateClickFunctions()
     self:RegisterFrameEvents()
+    self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnLeaveCombat")
+    self:RegisterEvent("UPDATE_INSTANCE_INFO", "OnInstanceInfoUpdate")
+    self.instanceInfoReady = false
+    self.cachedLockoutsRaids = {}
+    self.cachedLockoutsDungeons = {}
+    if RequestRaidInfo then
+        RequestRaidInfo()
+    else
+        self.instanceInfoReady = true
+    end
     self:Refresh()
 end
 
 function ClockModule:OnDisable()
-    self.clockFrame:Hide()
+    self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+    self:UnregisterEvent("UPDATE_INSTANCE_INFO")
+    self:UnregisterEvent("PLAYER_UPDATE_RESTING")
+    self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+
+    if self.clockFrame then
+        self.clockFrame:SetScript("OnUpdate", nil)
+        self.clockFrame:Hide()
+    end
+end
+
+function ClockModule:EnsureFrames()
+    if self.framesInitialized then return end
+    if self.clockFrame == nil then
+        self.clockFrame = CreateFrame("FRAME", nil, xb:GetFrame('bar'))
+        xb:RegisterFrame('clockFrame', self.clockFrame)
+    end
+    self.clockFrame:Show()
+    self:CreateFrames()
+    self:RegisterFrameEvents()
+    self.framesInitialized = true
 end
 
 function ClockModule:Refresh()
     local db = xb.db.profile
-    if self.clockFrame == nil then
-        return;
-    end
-    if not db.modules.clock.enabled then
-        self:Disable();
-        return;
+
+    if not xb:IsFreePlacementEnabled() and db.modules.clock.enabled ~= true then
+        db.modules.clock.enabled = true
     end
 
-    if InCombatLockdown() then
-        self:SetClockColor()
+    if not db.modules.clock.enabled then
+        self:Disable()
         return
     end
 
-    self.clockText:SetFont(xb:GetFont(db.modules.clock.fontSize))
-    self:SetClockColor()
+    self:EnsureFrames()
+    if self.clockFrame == nil then
+        return;
+    end
 
-    self.clockFrame:SetSize(self.clockText:GetStringWidth(), self.clockText:GetStringHeight())
+    self.clockText:SetFont(xb:GetFont(xb.db.profile.modules.clock.fontSize))
+    local dateString
+    if xb.db.profile.modules.clock.serverTime then
+        dateString = GetServerTimeString(xb.db.profile.modules.clock.timeFormat)
+    else
+        local clockTime = time()
+        dateString = date(ClockModule.timeFormats[xb.db.profile.modules.clock.timeFormat], clockTime)
+    end
+    self.clockText:SetText(dateString)
+    self:SetClockColor()
+    self:ApplyRestIconTexture()
+    self:UpdateResting()
+
+    if InCombatLockdown() then
+        self.needsResize = true
+        return
+    end
+
+    local clockTextWidth = SnapToEvenPixel(self.clockText:GetStringWidth())
+    local clockTextHeight = floor((self.clockText:GetStringHeight() or 0) + 0.5)
+    if clockTextHeight < 1 then
+        clockTextHeight = 1
+    end
+
+    self.clockFrame:SetSize(clockTextWidth, clockTextHeight)
+    self.clockFrame:ClearAllPoints()
     self.clockFrame:SetPoint('CENTER')
 
-    self.clockTextFrame:SetSize(self.clockText:GetStringWidth(), self.clockText:GetStringHeight())
+    self.clockTextFrame:SetSize(clockTextWidth, clockTextHeight)
+    self.clockTextFrame:ClearAllPoints()
     self.clockTextFrame:SetPoint('CENTER')
 
+    self.clockText:ClearAllPoints()
     self.clockText:SetPoint('CENTER')
 
-    self.eventText:SetFont(xb:GetFont(db.text.smallFontSize))
+    if self.restIconFrame then
+        self.restIconFrame:SetFrameStrata(self.clockFrame:GetFrameStrata())
+        self.restIconFrame:SetFrameLevel((self.clockTextFrame:GetFrameLevel() or self.clockFrame:GetFrameLevel()) + 20)
+        self.restIconFrame:ClearAllPoints()
+        local pos = xb.db.profile.modules.clock.restIconPosition or 'TOPRIGHT'
+        local xOff = xb.db.profile.modules.clock.restIconXOffset or 0
+        local yOff = xb.db.profile.modules.clock.restIconYOffset or 0
+        self.restIconFrame:SetPoint(pos, self.clockFrame, pos, xOff, yOff)
+    end
+
+    self.eventText:SetFont(xb:GetFont(xb.db.profile.text.smallFontSize))
+    self.eventText:ClearAllPoints()
     self.eventText:SetPoint('CENTER', self.clockText, xb.miniTextPosition)
     if xb.db.profile.modules.clock.hideEventText then
         self.eventText:Hide()
+    else
+        self.eventText:Show()
     end
+
+    xb:ApplyModuleFreePlacement('clock', self.clockFrame)
 end
 
 function ClockModule:CreateFrames()
     self.clockTextFrame = self.clockTextFrame or CreateFrame("BUTTON", nil, self.clockFrame)
     self.clockText = self.clockText or self.clockTextFrame:CreateFontString(nil, "OVERLAY")
     self.eventText = self.eventText or self.clockTextFrame:CreateFontString(nil, "OVERLAY")
+    self.restIconFrame = self.restIconFrame or CreateFrame("Frame", nil, self.clockFrame)
+    if not self.restIcon then
+        self.restIcon = self.restIconFrame:CreateTexture(nil, "OVERLAY")
+        self.restIcon:SetDrawLayer("OVERLAY", 7)
+        self.restIcon:ClearAllPoints()
+        self.restIcon:SetPoint("CENTER")
+    end
+    self:ApplyRestIconTexture()
 end
 
 function ClockModule:RegisterFrameEvents()
@@ -118,10 +447,10 @@ function ClockModule:RegisterFrameEvents()
     self.clockTextFrame:EnableMouse(true)
     self.clockTextFrame:RegisterForClicks("AnyUp")
 
-    self.clockFrame:SetScript("OnUpdate", function(self, elapsed)
+    self.clockFrame:SetScript("OnUpdate", function(_, elapsed)
         ClockModule.elapsed = ClockModule.elapsed + elapsed
         if ClockModule.elapsed >= 1 then
-            local dateString = nil
+            local dateString
             if xb.db.profile.modules.clock.serverTime then
                 dateString = GetServerTimeString(xb.db.profile.modules.clock.timeFormat)
             else
@@ -130,10 +459,10 @@ function ClockModule:RegisterFrameEvents()
             end
             ClockModule.clockText:SetText(dateString)
 
-            if not xb.db.profile.modules.clock.hideEventText then
+            if not xb.db.profile.modules.clock.hideEventText and C_Calendar and C_Calendar.GetNumPendingInvites then
                 local eventInvites = C_Calendar.GetNumPendingInvites()
                 if eventInvites > 0 then
-                    ClockModule.eventText:SetText(string.format("%s  (|cffffff00%i|r)", L['New Event!'], eventInvites))
+                    ClockModule.eventText:SetText(string.format("%s  (|cffffff00%i|r)", L["NEW_EVENT"], eventInvites))
                 end
             end
 
@@ -143,36 +472,13 @@ function ClockModule:RegisterFrameEvents()
     end)
 
     self.clockTextFrame:SetScript('OnEnter', function()
-        if InCombatLockdown() then
-            return;
-        end
         ClockModule:SetClockColor()
-        GameTooltip:SetOwner(ClockModule.clockTextFrame, 'ANCHOR_' .. xb.miniTextPosition, 0, 3)
-        -- GameTooltip:SetPoint(xb.db.profile.general.barPosition, self.clockTextFrame, xb.miniTextPosition, 0, 1)
-        local r, g, b, _ = unpack(xb:HoverColors())
-        GameTooltip:AddLine("|cFFFFFFFF[|r" .. TIMEMANAGER_TITLE .. "|cFFFFFFFF]|r", r, g, b)
-        GameTooltip:AddLine(" ")
-        local clockTime = nil
-        if xb.db.profile.modules.clock.serverTime then
-            clockTime = time()
-        else
-            clockTime = GetServerTime()
-        end
-
-        local realmTime = GetServerTimeString(xb.db.profile.modules.clock.timeFormat)
-
-        GameTooltip:AddDoubleLine(L['Local Time'],
-            date(ClockModule.timeFormats[xb.db.profile.modules.clock.timeFormat], clockTime), r, g, b, 1, 1, 1)
-        GameTooltip:AddDoubleLine(L['Realm Time'], realmTime, r, g, b, 1, 1, 1)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddDoubleLine('<' .. L['Left-Click'] .. '>', L['Open Calendar'], r, g, b, 1, 1, 1)
-        GameTooltip:AddDoubleLine('<' .. L['Right-Click'] .. '>', L['Open Clock'], r, g, b, 1, 1, 1)
-        GameTooltip:Show()
+        ClockModule:ShowTooltip()
     end)
 
     self.clockTextFrame:SetScript('OnLeave', function()
         if InCombatLockdown() then
-            return;
+            return
         end
         ClockModule:SetClockColor()
         GameTooltip:Hide()
@@ -180,10 +486,12 @@ function ClockModule:RegisterFrameEvents()
 
     self.clockTextFrame:SetScript('OnClick', function(_, button)
         if InCombatLockdown() then
-            return;
+            return
         end
         if button == 'LeftButton' then
-            ToggleCalendar()
+            if ToggleCalendar and type(ToggleCalendar) == "function" then
+                ToggleCalendar()
+            end
         elseif button == 'RightButton' then
             if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
                 ToggleTimeManager()
@@ -192,14 +500,172 @@ function ClockModule:RegisterFrameEvents()
             end
         end
     end)
+
+    self:RegisterEvent("PLAYER_UPDATE_RESTING", "OnRestingUpdate")
+    self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnRestingUpdate")
 end
 
 function ClockModule:SetClockColor()
-    local db = xb.db.profile
     if self.clockTextFrame:IsMouseOver() then
         self.clockText:SetTextColor(unpack(xb:HoverColors()))
     else
         self.clockText:SetTextColor(xb:GetColor('normal'))
+    end
+end
+
+function ClockModule:RefreshLockoutCache()
+    self.cachedLockoutsRaids, self.cachedLockoutsDungeons = collectSavedLockouts()
+end
+
+function ClockModule:BuildLockoutTooltip(r, g, b)
+    local opts = xb.db.profile.modules.clock
+    if not opts.showLockoutsInTooltip then
+        return
+    end
+
+    if not self.instanceInfoReady then
+        return
+    end
+
+    local raids = self.cachedLockoutsRaids or {}
+    local dungeons = self.cachedLockoutsDungeons or {}
+    local hasRaids = #raids > 0
+    local hasDungeons = #dungeons > 0
+
+    if not hasRaids and not hasDungeons then
+        return
+    end
+
+    local sections = {}
+    if hasRaids then
+        sections[#sections + 1] = { RAIDS, raids }
+    end
+    if hasDungeons then
+        sections[#sections + 1] = { DUNGEONS, dungeons }
+    end
+
+    GameTooltip:AddLine(L["CLOCK_LOCKOUTS_HEADER"])
+
+    for i, section in ipairs(sections) do
+        GameTooltip:AddLine("-- " .. section[1] .. " --", 1, 0.502, 0)
+        for _, entry in ipairs(section[2]) do
+            GameTooltip:AddDoubleLine(formatLockoutLabel(entry), formatLockoutDetail(entry), r, g, b, 1, 1, 1)
+        end
+        if i < #sections then
+            GameTooltip:AddLine(" ")
+        end
+    end
+
+    GameTooltip:AddLine(" ")
+end
+
+function ClockModule:ShowTooltip()
+    if not xb:ShouldShowTooltip() then
+        GameTooltip:Hide()
+        return
+    end
+
+    GameTooltip:SetOwner(self.clockTextFrame, 'ANCHOR_' .. xb.miniTextPosition, 0, 3)
+    GameTooltip:ClearLines()
+    local r, g, b, _ = unpack(xb:HoverColors())
+    GameTooltip:AddLine("|cFFFFFFFF[|r" .. TIMEMANAGER_TITLE .. "|cFFFFFFFF]|r", r, g, b)
+    GameTooltip:AddLine(" ")
+
+    local clockTime
+    if xb.db.profile.modules.clock.serverTime then
+        clockTime = time()
+    else
+        clockTime = GetServerTime()
+    end
+
+    local realmTime = GetServerTimeString(xb.db.profile.modules.clock.timeFormat)
+
+    GameTooltip:AddDoubleLine(L["LOCAL_TIME"],
+        date(self.timeFormats[xb.db.profile.modules.clock.timeFormat], clockTime), r, g, b, 1, 1, 1)
+    GameTooltip:AddDoubleLine(L["REALM_TIME"], realmTime, r, g, b, 1, 1, 1)
+    GameTooltip:AddLine(" ")
+
+    local today = GetCurrentCalendarTime()
+    local day = today.monthDay
+    local numDayEvents = GetNumDayEvents(0, day)
+    if numDayEvents > 0 then
+        GameTooltip:AddLine(EVENTS_LABEL)
+
+        for i = 1, numDayEvents do
+            local event = GetHolidayInfo(0, day, i)
+            if event then
+                local startText = FormatCalendarDateTime(event.startTime)
+                local endText = FormatCalendarDateTime(event.endTime)
+
+                if startText and endText then
+                    GameTooltip:AddDoubleLine(event.name, startText .. " - " .. endText, r, g, b, 1, 1, 1)
+                elseif startText then
+                    GameTooltip:AddDoubleLine(event.name, startText, r, g, b, 1, 1, 1)
+                else
+                    GameTooltip:AddDoubleLine(event.name, "", r, g, b, 1, 1, 1)
+                end
+            end
+        end
+
+        GameTooltip:AddLine(" ")
+    end
+
+    if not self.instanceInfoReady and RequestRaidInfo then
+        RequestRaidInfo()
+    end
+
+    self:BuildLockoutTooltip(r, g, b)
+
+    if ToggleCalendar and type(ToggleCalendar) == "function" then
+        GameTooltip:AddDoubleLine('<' .. L["LEFT_CLICK"] .. '>', L["OPEN_CALENDAR"], r, g, b, 1, 1, 1)
+    end
+    GameTooltip:AddDoubleLine('<' .. L["RIGHT_CLICK"] .. '>', L["OPEN_CLOCK"], r, g, b, 1, 1, 1)
+    GameTooltip:Show()
+end
+
+function ClockModule:OnInstanceInfoUpdate()
+    self.instanceInfoReady = true
+    self:RefreshLockoutCache()
+    if self.clockTextFrame and GameTooltip:IsOwned(self.clockTextFrame) then
+        self:ShowTooltip()
+    end
+end
+
+function ClockModule:UpdateResting()
+    if not self.restIcon or not self.restIconFrame then return end
+    if not xb.db.profile.modules.clock.showRestIcon then
+        self.restIconFrame:Hide()
+        return
+    end
+
+    if xb.db.profile.modules.clock.hideRestIconMaxLevel then
+        local playerLevel = UnitLevel and UnitLevel("player") or 0
+        local maxLevel = nil
+        if GetMaxLevelForPlayerExpansion then
+            maxLevel = GetMaxLevelForPlayerExpansion()
+        elseif GetMaxPlayerLevel then
+            maxLevel = GetMaxPlayerLevel()
+        end
+        if maxLevel and playerLevel >= maxLevel then
+            self.restIconFrame:Hide()
+            return
+        end
+    end
+
+    if IsResting and IsResting() then
+        self.restIconFrame:Show()
+    else
+        self.restIconFrame:Hide()
+    end
+end
+
+function ClockModule:OnRestingUpdate()
+    self:UpdateResting()
+end
+
+function ClockModule:RefreshTooltipIfShown()
+    if self.clockTextFrame and GameTooltip:IsOwned(self.clockTextFrame) then
+        self:ShowTooltip()
     end
 end
 
@@ -215,12 +681,24 @@ function ClockModule:GetDefaultOptions()
         timeFormat = 'twelveAmPm',
         fontSize = 20,
         serverTime = false,
-        hideEventText = false
+        hideEventText = false,
+        showLockoutsInTooltip = true,
+        showBossesKilledInLockouts = true,
+        showRestIcon = true,
+        restIconTextureMode = "default",
+        restIconCustomTexture = nil,
+        hideRestIconMaxLevel = false,
+        restIconSize = 20,
+        restIconXOffset = 17,
+        restIconYOffset = 10,
+        restIconPosition = "TOPRIGHT",
+        restIconUseCustomColor = false,
+        restIconUseClassColor = false,
+        restIconColor = { r = 1, g = 1, b = 1, a = 1 }
     }
 end
 
 function ClockModule:GetConfig()
-    local timeFormatOptions = self.exampleTimeFormats
     return {
         name = self:GetName(),
         type = "group",
@@ -230,7 +708,7 @@ function ClockModule:GetConfig()
                 order = 0,
                 type = "toggle",
                 get = function()
-                    return xb.db.profile.modules.clock.enabled;
+                    return xb.db.profile.modules.clock.enabled
                 end,
                 set = function(_, val)
                     xb.db.profile.modules.clock.enabled = val
@@ -241,10 +719,12 @@ function ClockModule:GetConfig()
                     end
                 end,
                 width = "full",
-                hidden = true
+                disabled = function()
+                    return not xb:IsFreePlacementEnabled()
+                end,
             },
             useServerTime = {
-                name = L['Use Server Time'],
+                name = L["USE_SERVER_TIME"],
                 order = 1,
                 type = "toggle",
                 get = function()
@@ -255,7 +735,7 @@ function ClockModule:GetConfig()
                 end
             },
             hideEventText = {
-                name = L['Hide Event Text'],
+                name = L["HIDE_EVENT_TEXT"],
                 order = 2,
                 type = "toggle",
                 get = function()
@@ -266,7 +746,7 @@ function ClockModule:GetConfig()
                 end
             },
             timeFormat = {
-                name = L['Time Format'],
+                name = L["TIME_FORMAT"],
                 order = 3,
                 type = "select",
                 values = { -- TODO: WTF is with this not accepting a variable?
@@ -281,9 +761,10 @@ function ClockModule:GetConfig()
                 get = function()
                     return xb.db.profile.modules.clock.timeFormat;
                 end,
-                set = function(info, val)
+                set = function(_, val)
                     xb.db.profile.modules.clock.timeFormat = val;
                     self:Refresh();
+                    self:RefreshTooltipIfShown();
                 end
             },
             fontSize = {
@@ -296,11 +777,251 @@ function ClockModule:GetConfig()
                 get = function()
                     return xb.db.profile.modules.clock.fontSize;
                 end,
-                set = function(info, val)
+                set = function(_, val)
                     xb.db.profile.modules.clock.fontSize = val;
                     self:Refresh();
                 end
-            }
+            },
+            lockoutRow = XIVBar.ColumnRow(4.5, {
+                name = L["CLOCK_SHOW_LOCKOUTS"],
+                order = 4.5,
+                type = "toggle",
+                get = function()
+                    return xb.db.profile.modules.clock.showLockoutsInTooltip;
+                end,
+                set = function(_, val)
+                    xb.db.profile.modules.clock.showLockoutsInTooltip = val;
+                end
+            },
+            {
+                name = L["CLOCK_SHOW_BOSSES_KILLED"],
+                order = 4.7,
+                type = "toggle",
+                get = function()
+                    return xb.db.profile.modules.clock.showBossesKilledInLockouts ~= false;
+                end,
+                set = function(_, val)
+                    xb.db.profile.modules.clock.showBossesKilledInLockouts = val;
+                    self:RefreshTooltipIfShown();
+                end,
+                hidden = function()
+                    return not xb.db.profile.modules.clock.showLockoutsInTooltip;
+                end,
+            }),
+            restIconHeader = {
+                name = L["REST_ICON"],
+                order = 5,
+                type = "header"
+            },
+            showRestIcon = {
+                name = L["SHOW_REST_ICON"],
+                order = 6,
+                type = "toggle",
+                get = function()
+                    return xb.db.profile.modules.clock.showRestIcon;
+                end,
+                set = function(_, val)
+                    xb.db.profile.modules.clock.showRestIcon = val;
+                    self:UpdateResting();
+                    self:Refresh();
+                end,
+            },
+            hideRestIconMaxLevel = {
+                name = L["HIDE_REST_ICON_MAX_LEVEL"],
+                order = 7,
+                type = "toggle",
+                get = function()
+                    return xb.db.profile.modules.clock.hideRestIconMaxLevel;
+                end,
+                set = function(_, val)
+                    xb.db.profile.modules.clock.hideRestIconMaxLevel = val;
+                    self:UpdateResting();
+                    self:Refresh();
+                end,
+            },
+            restIconSize = {
+                name = L["TEXTURE_SIZE"],
+                order = 8,
+                type = 'range',
+                min = 10,
+                max = 64,
+                step = 1,
+                get = function()
+                    return xb.db.profile.modules.clock.restIconSize;
+                end,
+                set = function(_, val)
+                    xb.db.profile.modules.clock.restIconSize = val;
+                    self:ApplyRestIconTexture();
+                    self:Refresh();
+                end,
+            },
+            restIconPosition = {
+                name = L["POSITION"],
+                order = 9,
+                type = "select",
+                values = {
+                    TOPLEFT = "TOPLEFT", TOP = "TOP", TOPRIGHT = "TOPRIGHT",
+                    LEFT = "LEFT", CENTER = "CENTER", RIGHT = "RIGHT",
+                    BOTTOMLEFT = "BOTTOMLEFT", BOTTOM = "BOTTOM", BOTTOMRIGHT = "BOTTOMRIGHT"
+                },
+                get = function()
+                    return xb.db.profile.modules.clock.restIconPosition;
+                end,
+                set = function(_, val)
+                    xb.db.profile.modules.clock.restIconPosition = val;
+                    self:Refresh();
+                end,
+            },
+            restIconXOffset = {
+                name = L["X_OFFSET"],
+                order = 10,
+                type = 'range',
+                min = -100,
+                max = 100,
+                step = 1,
+                get = function()
+                    return xb.db.profile.modules.clock.restIconXOffset;
+                end,
+                set = function(_, val)
+                    xb.db.profile.modules.clock.restIconXOffset = val;
+                    self:Refresh();
+                end,
+                width = "double"
+            },
+            restIconYOffset = {
+                name = L["Y_OFFSET"],
+                order = 11,
+                type = 'range',
+                min = -100,
+                max = 100,
+                step = 1,
+                get = function()
+                    return xb.db.profile.modules.clock.restIconYOffset;
+                end,
+                set = function(_, val)
+                    xb.db.profile.modules.clock.restIconYOffset = val;
+                    self:Refresh();
+                end,
+                width = "double"
+            },
+            restIconUseCustomColor = {
+                name = L["CUSTOM_TEXTURE_COLOR"],
+                order = 12,
+                type = "toggle",
+                get = function()
+                    return xb.db.profile.modules.clock.restIconUseCustomColor;
+                end,
+                set = function(_, val)
+                    xb.db.profile.modules.clock.restIconUseCustomColor = val;
+                    self:ApplyRestIconTexture();
+                    self:Refresh();
+                end,
+                width = "full"
+            },
+            restIconUseClassColor = {
+                name = L["USE_CLASS_COLORS"],
+                order = 13,
+                type = "toggle",
+                get = function()
+                    return xb.db.profile.modules.clock.restIconUseClassColor;
+                end,
+                set = function(_, val)
+                    xb.db.profile.modules.clock.restIconUseClassColor = val;
+                    self:ApplyRestIconTexture();
+                    self:Refresh();
+                end,
+                hidden = function()
+                    return not xb.db.profile.modules.clock.restIconUseCustomColor
+                end,
+            },
+            restIconColor = {
+                name = L["COLOR"],
+                order = 14,
+                type = "color",
+                hasAlpha = true,
+                get = function()
+                    local c = xb.db.profile.modules.clock.restIconColor
+                    if xb.db.profile.modules.clock.restIconUseClassColor then
+                        local r, g, b = xb:GetClassColors()
+                        return r, g, b, c.a
+                    end
+                    return c.r, c.g, c.b, c.a
+                end,
+                set = function(_, r, g, b, a)
+                    local current = xb.db.profile.modules.clock.restIconColor or { r = 1, g = 1, b = 1, a = 1 }
+                    if xb.db.profile.modules.clock.restIconUseClassColor then
+                        xb.db.profile.modules.clock.restIconColor = { r = current.r, g = current.g, b = current.b, a = a }
+                    else
+                        xb.db.profile.modules.clock.restIconColor = { r = r, g = g, b = b, a = a }
+                    end
+                    self:ApplyRestIconTexture();
+                    self:Refresh();
+                end,
+                hidden = function()
+                    return not xb.db.profile.modules.clock.restIconUseCustomColor
+                end,
+            },
+            restIconTextureMode = {
+                name = L["TEXTURE"],
+                order = 15,
+                type = "select",
+                values = function()
+                    local values = {
+                        default = L["DEFAULT"],
+                        custom = L["CUSTOM"]
+                    }
+                    local elvui = _G.ElvUI and _G.ElvUI[1]
+                    local icons = elvui and elvui.Media and elvui.Media.RestIcons
+                    if icons then
+                        for key, tex in pairs(icons) do
+                            if tex and elvui and elvui.TextureString then
+                                values[key] = elvui:TextureString(tex, ':14:14')
+                            else
+                                values[key] = tex or key
+                            end
+                        end
+                    end
+                    return values
+                end,
+                sorting = function()
+                    local sorting = { "default", "custom" }
+                    local elvui = _G.ElvUI and _G.ElvUI[1]
+                    local icons = elvui and elvui.Media and elvui.Media.RestIcons
+                    if icons then
+                        for key in pairs(icons) do
+                            if key ~= "default" and key ~= "custom" then
+                                sorting[#sorting + 1] = key
+                            end
+                        end
+                    end
+                    return sorting
+                end,
+                get = function()
+                    return xb.db.profile.modules.clock.restIconTextureMode;
+                end,
+                set = function(_, val)
+                    xb.db.profile.modules.clock.restIconTextureMode = val;
+                    self:ApplyRestIconTexture();
+                    self:Refresh();
+                end
+            },
+            restIconCustomTexture = {
+                name = L["CUSTOM_TEXTURE"],
+                order = 16,
+                type = "input",
+                get = function()
+                    return xb.db.profile.modules.clock.restIconCustomTexture;
+                end,
+                set = function(_, val)
+                    local trimmed = (val and val:match("%S")) and val or nil
+                    xb.db.profile.modules.clock.restIconCustomTexture = trimmed;
+                    self:ApplyRestIconTexture();
+                    self:Refresh();
+                end,
+                hidden = function()
+                    return xb.db.profile.modules.clock.restIconTextureMode ~= "custom";
+                end
+            },
         }
     }
 end

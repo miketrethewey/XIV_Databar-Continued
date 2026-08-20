@@ -5,6 +5,7 @@
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
+[![Discord][discord-shield]][discord-url]
 [![MIT License][license-shield]][license-url]
 
 <!-- PROJECT LOGO -->
@@ -30,12 +31,8 @@
 <details>
   <summary>Table of Contents</summary>
   <ol>
-    <li>
-        <a href="#about-the-project">About The Project</a>
-        <ul>
-            <li><a href="#built-with">Built With</a></li>
-        </ul>
-    </li>
+    <li><a href="#download">Download</a></li>
+    <li><a href="#about-the-project">About The Project</a></li>
     <li><a href="#slash-commands">Slash Commands</a></li>
     <li><a href="#modules">Modules</a></li>
     <li><a href="#features">Features</a></li>
@@ -44,8 +41,16 @@
     <li><a href="#localization">Localization</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
+    <li><a href="#stars">Stars</a></li>
   </ol>
 </details>
+
+## Download
+
+[![CurseForge](https://cf.way2muchnoise.eu/title/787614.svg?badge_style=for_the_badge)](https://www.curseforge.com/wow/addons/xiv-databar-continued) [![Wago](https://tinyurl.com/WagoBadge)](https://addons.wago.io/addons/xiv-databar-continued)
+[![WowInterface](https://tinyurl.com/WoWInterfaceBadge)](https://www.wowinterface.com/downloads/info26826-3.7.html) [![Github Releases](https://img.shields.io/badge/GitHub%20Releases-121013?style=for-the-badge&logo=github&logoColor=white)](https://github.com/ZelionGG/XIV_Databar-Continued/releases)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
@@ -55,14 +60,6 @@
 Pursuing the work of MilleXIV, [Vicious-wow](https://github.com/Vicious-wow/XIV_Databar) and [Kozoaku](https://github.com/Kozoaku/XIV_Databar).
 
 A reworking of [SX_Databar by saxitoxin](https://www.wowinterface.com/downloads/info23745-SX_DataBar.html).
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-### Built With
-
-This section should list any major frameworks/libraries used to bootstrap your project. Leave any add-ons/plugins for the acknowledgements section. Here are a few examples.
-
-* [![Lua][Lua]][Lua-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -96,12 +93,6 @@ This section should list any major frameworks/libraries used to bootstrap your p
 
 ## Roadmap
 
-- [x] Add a Loadout manager (next to the talent manager) that will allow you to change your talents easily
-- [x] Hearthstones
-    - [x] Add a hearthstone randomizer (uses a random hearthstone each time you click the button)
-    - [x] Add an option to favor Hearthstones
-- [ ] Changelog in the GUI 
-
 See the [open issues](https://github.com/ZelionGG/XIV_Databar-Continued/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -117,10 +108,11 @@ See the [open issues](https://github.com/ZelionGG/XIV_Databar-Continued/issues) 
 
 ## Localization
 
-- PhatsoTGT - German Localization
-- Amanthuul - Russian Localization
-- Yaoenqi - Chinese Localization
-- [class2u](https://github.com/class2u) - Chinese (Taiwan) Localization
+- PhatsoTGT - German
+- Amanthuul - Russian
+- Yaoenqi - Chinese
+- [class2u](https://github.com/class2u) - Chinese (Taiwan)
+- [BrunoKrugel](https://github.com/BrunoKrugel) - Brazilian Portuguese
 
 __I am actually looking for people that want to help with localization of XIV_Databar Continued, don't hesitate to check [#10](https://github.com/ZelionGG/XIV_Databar-Continued/issues/10) and to contact me on [X (Twitter)](https://twitter.com/ZelionGG)__ 
 
@@ -150,6 +142,13 @@ Distributed under the GPL-3.0 License. See `LICENSE` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+<!-- STARS -->
+## Stars
+
+[![Stars over time](https://starchart.cc/ZelionGG/XIV_Databar-Continued.svg?variant=adaptive)](https://starchart.cc/ZelionGG/XIV_Databar-Continued)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 
 [contributors-shield]: https://img.shields.io/github/contributors/ZelionGG/XIV_Databar-Continued.svg?style=for-the-badge
 [contributors-url]: https://github.com/ZelionGG/XIV_Databar-Continued/graphs/contributors
@@ -159,6 +158,8 @@ Distributed under the GPL-3.0 License. See `LICENSE` for more information.
 [stars-url]: https://github.com/ZelionGG/XIV_Databar-Continued/stargazers
 [issues-shield]: https://img.shields.io/github/issues/ZelionGG/XIV_Databar-Continued.svg?style=for-the-badge
 [issues-url]: https://github.com/ZelionGG/XIV_Databar-Continued/issues
+[discord-shield]: https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white
+[discord-url]: https://discord.gg/g7JZNGSU32
 [license-shield]: https://img.shields.io/github/license/ZelionGG/XIV_Databar-Continued.svg?style=for-the-badge
 [license-url]: https://github.com/ZelionGG/XIV_Databar-Continued/blob/master/LICENSE.txt
 [xiv-screenshot]: https://i.ibb.co/k5r5mCg/xiv-databar-continued.png

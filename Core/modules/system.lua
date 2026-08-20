@@ -1,5 +1,5 @@
-local AddOnName, XIVBar = ...;
-local _G = _G;
+---@class XIVBar
+local XIVBar = select(2, ...);
 local xb = XIVBar;
 local L = XIVBar.L;
 
@@ -7,6 +7,10 @@ local SystemModule = xb:NewModule("SystemModule", 'AceEvent-3.0', 'AceHook-3.0')
 
 local GetNumAddOns = C_AddOns.GetNumAddOns
 local GetAddOnInfo = C_AddOns.GetAddOnInfo
+
+local function IsUsableAnchor(frame)
+    return frame and frame:IsShown() and frame:GetWidth() > 0
+end
 
 function SystemModule:GetName()
     return SYSTEMOPTIONS_MENU;
@@ -89,37 +93,48 @@ function SystemModule:Refresh()
     end
 
     if db.modules.system.showWorld then
-        self.worldPingText:SetText('000' .. MILLISECONDS_ABBR)
+        self.worldPingText:SetText(L["W"] .. ": 000" .. MILLISECONDS_ABBR)
     elseif self.worldPing then
         self.worldPingText:SetText('')
     end
 
-    self.pingText:SetText('000' .. MILLISECONDS_ABBR) -- get the widest we can be
+    -- use localized labels to size for wider glyphs (e.g., Chinese)
+    local gapIconToText = 3
+    local gapTextToWorld = 3
 
-    local pingWidest = self.pingText:GetStringWidth() + 5
-    if db.modules.system.showWorld then
-        self.worldPingText:SetPoint('LEFT', self.pingText, 'RIGHT', 5, 0)
-        pingWidest = pingWidest + self.worldPingText:GetStringWidth() + 5
-    end
-    self.pingText:SetPoint('LEFT', self.pingIcon, 'RIGHT', 5, 0)
-
+    -- set actual texts before measuring to avoid trailing empty space
     self:UpdateTexts()
 
+    local pingWidest = self.pingText:GetStringWidth() + gapIconToText
+    if db.modules.system.showWorld then
+        self.worldPingText:SetPoint('LEFT', self.pingText, 'RIGHT', gapTextToWorld, 0)
+        pingWidest = pingWidest + gapTextToWorld + self.worldPingText:GetStringWidth()
+    end
+    self.pingText:SetPoint('LEFT', self.pingIcon, 'RIGHT', gapIconToText, 0)
+
     self.fpsFrame:SetSize(fpsWidest + iconSize + 5, xb:GetHeight())
-    self.fpsFrame:SetPoint('LEFT')
-
     self.pingFrame:SetSize(pingWidest + iconSize, xb:GetHeight())
-    self.pingFrame:SetPoint('LEFT', self.fpsFrame, 'RIGHT', 5, 0)
 
+    -- grow left: anchor ping on the right edge, then place fps to its left
     self.systemFrame:SetSize(self.fpsFrame:GetWidth() + self.pingFrame:GetWidth(), xb:GetHeight())
+    self.pingFrame:ClearAllPoints()
+    self.pingFrame:SetPoint('RIGHT', self.systemFrame, 'RIGHT', 0, 0)
+    self.fpsFrame:ClearAllPoints()
+    self.fpsFrame:SetPoint('RIGHT', self.pingFrame, 'LEFT', -gapIconToText, 0)
+
+    if xb:ApplyModuleFreePlacement('system', self.systemFrame) then
+        return
+    end
 
     -- self.systemFrame:SetSize()
     local relativeAnchorPoint = 'LEFT'
-    local xOffset = db.general.moduleSpacing
+    -- spacing toward gold: use configured module spacing
+    local xOffset = db.general.moduleSpacing - 5
     local parentFrame = xb:GetFrame('goldFrame');
-    if not xb.db.profile.modules.gold.enabled then
-        if xb.db.profile.modules.travel.enabled then
-            parentFrame = xb:GetFrame('travelFrame');
+    if not xb.db.profile.modules.gold.enabled or not IsUsableAnchor(parentFrame) then
+        local travelFrame = xb:GetFrame('travelFrame');
+        if xb.db.profile.modules.travel.enabled and IsUsableAnchor(travelFrame) then
+            parentFrame = travelFrame;
         else
             relativeAnchorPoint = 'RIGHT'
             xOffset = 15
@@ -137,9 +152,9 @@ function SystemModule:UpdateTexts()
 
     self.fpsText:SetText(floor(GetFramerate()) .. FPS_ABBR)
     local _, _, homePing, worldPing = GetNetStats()
-    self.pingText:SetText(L['L'] .. ": " .. floor(homePing) .. MILLISECONDS_ABBR)
+    self.pingText:SetText(L["L"] .. ": " .. floor(homePing) .. MILLISECONDS_ABBR)
     if xb.db.profile.modules.system.showWorld then
-        self.worldPingText:SetText(L['W'] .. ": " .. floor(worldPing) .. MILLISECONDS_ABBR)
+        self.worldPingText:SetText(L["W"] .. ": " .. floor(worldPing) .. MILLISECONDS_ABBR)
     end
 end
 
@@ -176,7 +191,6 @@ function SystemModule:LeaveFunction()
     if InCombatLockdown() then
         return
     end
-    local db = xb.db.profile
     self.fpsText:SetTextColor(xb:GetColor('normal'))
     self.pingText:SetTextColor(xb:GetColor('normal'))
     if xb.db.profile.modules.system.showWorld then
@@ -198,13 +212,13 @@ function SystemModule:SetOnClickScript(prefix)
             collectgarbage()
             local after = collectgarbage('count')
             local memDiff = before - after
-            local memString = ''
+            local memString
             if memDiff > 1024 then
                 memString = string.format("%.2f MB", (memDiff / 1024))
             else
                 memString = string.format("%.0f KB", floor(memDiff))
             end
-            print("|cff6699FFXIV_Databar|r: " .. L['Cleaned'] .. ": |cffffff00" .. memString)
+            print("|cff6699FFXIV_Databar|r: " .. L["CLEANED"] .. ": |cffffff00" .. memString)
         end
     end)
 end
@@ -235,10 +249,10 @@ function SystemModule:RegisterFrameEvents()
     self:SetOnClickScript('fps')
     self:SetOnClickScript('ping')
 
-    self.fpsFrame:SetScript('OnUpdate', function(self, elapsed)
+    self.fpsFrame:SetScript('OnUpdate', function(_, elapsed)
         SystemModule.elapsed = SystemModule.elapsed + elapsed
         if SystemModule.elapsed >= 1 then
-            if InCombatLockdown() then
+            if InCombatLockdown() or xb:IsFreePlacementEnabled() then
                 SystemModule:UpdateTexts()
             else
                 SystemModule:Refresh()
@@ -248,21 +262,28 @@ function SystemModule:RegisterFrameEvents()
     end)
 
     self:RegisterMessage('XIVBar_FrameHide', function(_, name)
-        if name == 'goldFrame' then
+        if name == 'goldFrame' or name == 'travelFrame' then
             self:Refresh()
         end
     end)
 
     self:RegisterMessage('XIVBar_FrameShow', function(_, name)
-        if name == 'goldFrame' then
+        if name == 'goldFrame' or name == 'travelFrame' then
             self:Refresh()
         end
     end)
 end
 
 function SystemModule:ShowTooltip()
+    if not xb.db.profile.modules.system.showTooltip then
+        return
+    end
+    if not xb:ShouldShowTooltip() then
+        GameTooltip:Hide()
+        return
+    end
+
     local totalAddons = GetNumAddOns()
-    local totalUsage = 0
     local memTable = {}
 
     UpdateAddOnMemoryUsage()
@@ -283,7 +304,7 @@ function SystemModule:ShowTooltip()
     GameTooltip:SetOwner(self.systemFrame, 'ANCHOR_' .. xb.miniTextPosition)
     GameTooltip:ClearLines()
     local r, g, b, _ = unpack(xb:HoverColors())
-    GameTooltip:AddLine("|cFFFFFFFF[|r" .. L['Memory Usage'] .. "|cFFFFFFFF]|r", r, g, b)
+    GameTooltip:AddLine("|cFFFFFFFF[|r" .. L["MEMORY_USAGE"] .. "|cFFFFFFFF]|r", r, g, b)
     GameTooltip:AddLine(" ")
 
     local toLoop = xb.db.profile.modules.system.addonsToShow
@@ -292,9 +313,9 @@ function SystemModule:ShowTooltip()
     end
 
     for i = 1, toLoop do
-        local memString = ''
         if memTable[i] then
             if memTable[i].memory > 0 then
+                local memString
                 if memTable[i].memory > 1024 then
                     memString = string.format("%.2f MB", (memTable[i].memory / 1024))
                 else
@@ -306,7 +327,7 @@ function SystemModule:ShowTooltip()
     end
 
     GameTooltip:AddLine(" ")
-    GameTooltip:AddDoubleLine('<' .. L['Left-Click'] .. '>', L['Garbage Collect'], r, g, b, 1, 1, 1)
+    GameTooltip:AddDoubleLine('<' .. L["LEFT_CLICK"] .. '>', L["GARBAGE_COLLECT"], r, g, b, 1, 1, 1)
     GameTooltip:Show()
 end
 
@@ -343,7 +364,7 @@ function SystemModule:GetConfig()
                 width = "full"
             },
             showTooltip = {
-                name = L['Show Tooltips'],
+                name = L["SHOW_TOOLTIPS"],
                 order = 1,
                 type = "toggle",
                 get = function()
@@ -355,7 +376,7 @@ function SystemModule:GetConfig()
                 end
             },
             showWorld = {
-                name = L['Show World Ping'],
+                name = L["WORLD_PING"],
                 order = 2,
                 type = "toggle",
                 get = function()
@@ -367,7 +388,7 @@ function SystemModule:GetConfig()
                 end
             },
             addonsToShow = {
-                name = L['Addons to Show in Tooltip'], -- DROPDOWN, GoldModule:GetCurrencyOptions
+                name = L["ADDONS_IN_TOOLTIP"], -- DROPDOWN, GoldModule:GetCurrencyOptions
                 type = "range",
                 order = 3,
                 min = 1,
@@ -376,13 +397,13 @@ function SystemModule:GetConfig()
                 get = function()
                     return xb.db.profile.modules.system.addonsToShow;
                 end,
-                set = function(info, value)
+                set = function(_, value)
                     xb.db.profile.modules.system.addonsToShow = value;
                     self:Refresh();
                 end
             },
             showAllOnShift = {
-                name = L['Show All Addons in Tooltip with Shift'],
+                name = L["SHOW_ALL_ADDONS"],
                 order = 4,
                 type = "toggle",
                 get = function()

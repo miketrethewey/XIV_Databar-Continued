@@ -1,22 +1,21 @@
-local AddOnName, XIVBar = ...;
+local AddOnName = ...;
+---@class XIVBar : AceAddon-3.0, AceConsole-3.0, AceEvent-3.0
+local XIVBar = select(2, ...);
 local _G = _G;
-local pairs, unpack, select = pairs, unpack, select
-local AceAddon, AceAddonMinor = _G.LibStub('AceAddon-3.0')
-local AceConfig = LibStub("AceConfig-3.0")
-local AceConfigDialog = LibStub("AceConfigDialog-3.0")
+local pairs, select = pairs, select
+local AceAddon = _G.LibStub('AceAddon-3.0')
 
 AceAddon:NewAddon(XIVBar, AddOnName, "AceConsole-3.0", "AceEvent-3.0");
 local L = LibStub("AceLocale-3.0"):GetLocale(AddOnName, true);
-local ldb = LibStub:GetLibrary("LibDataBroker-1.1"):NewDataObject(AddOnName, {
+LibStub:GetLibrary("LibDataBroker-1.1"):NewDataObject(AddOnName, {
     type = "launcher",
     icon = "Interface\\Icons\\Spell_Nature_StormReach",
-    OnClick = function(clickedframe, button) XIVBar:ToggleConfig() end
+    OnClick = function() XIVBar:ToggleConfig() end
 })
-local options
 
 XIVBar.Changelog = {}
 
-XIVBar.L = L
+XIVBar.L = L ---@type XIV_DatabarLocale
 
 _G.XIV_Databar_Continued_OnAddonCompartmentClick = function()
     XIVBar:ToggleConfig()
@@ -32,245 +31,452 @@ XIVBar.constants = {
     popupPadding = 10
 }
 
-XIVBar.defaults = {
-    profile = {
-        general = {
-            barPosition = "BOTTOM",
-            barPadding = 3,
-            moduleSpacing = 30,
-            barMargin = 0,
-            barFullscreen = true,
-            barWidth = GetScreenWidth(),
-            barHoriz = 'CENTER',
-            barCombatHide = false,
-            barFlightHide = false,
-            useElvUI = true
-        },
-        color = {
-            barColor = {r = 0.094, g = 0.094, b = 0.094, a = 0.75},
-            normal = {r = 0.8, g = 0.8, b = 0.8, a = 0.75},
-            inactive = {r = 1, g = 1, b = 1, a = 0.25},
-            useCC = false,
-            useTextCC = false,
-            useHoverCC = true,
-            hover = {
-                r = RAID_CLASS_COLORS[XIVBar.constants.playerClass].r,
-                g = RAID_CLASS_COLORS[XIVBar.constants.playerClass].g,
-                b = RAID_CLASS_COLORS[XIVBar.constants.playerClass].b,
-                a = RAID_CLASS_COLORS[XIVBar.constants.playerClass].a
-            }
-        },
-        text = {fontSize = 12, smallFontSize = 11, font = 'Homizio Bold'},
-        modules = {}
-    }
-};
-
 XIVBar.LSM = LibStub('LibSharedMedia-3.0');
 
--- Changelog Module
-function XIVBar:CreateColorString(text, db)
-    local hex = db.r and db.g and db.b and self:RGBToHex(db.r, db.g, db.b) or
-                    "|cffffffff"
-
-    local string = hex .. text .. "|r"
-    return string
-end
-
-function XIVBar:RGBToHex(r, g, b, header, ending)
-    r = r <= 1 and r >= 0 and r or 1
-    g = g <= 1 and g >= 0 and g or 1
-    b = b <= 1 and b >= 0 and b or 1
-
-    local hex = format('%s%02x%02x%02x%s', header or '|cff', r * 255, g * 255,
-                       b * 255, ending or '')
-    return hex
-end
-
 function XIVBar:OnInitialize()
-    self.db = LibStub("AceDB-3.0"):New("XIVBarDB", self.defaults, true)
+    -- Capture before AceDB creates a profile for a brand-new install.
+    local sv = _G.XIVBarDB
+    self._hadPriorInstall = type(sv) == "table"
+        and type(sv.profiles) == "table"
+        and next(sv.profiles) ~= nil
+
+    -- Omit default profile so new characters get a per-character "Name - Realm" profile.
+    -- Existing profileKeys (e.g. "Default") are preserved by AceDB.
+    self.db = LibStub("AceDB-3.0"):New("XIVBarDB", self.defaults)
     self.LSM:Register(self.LSM.MediaType.FONT, 'Homizio Bold',
                       self.constants.mediaPath .. "homizio_bold.ttf")
     self.frames = {}
 
     self.fontFlags = {'', 'OUTLINE', 'THICKOUTLINE', 'MONOCHROME'}
 
-    options = {
-        name = "XIV Bar Continued",
-        handler = XIVBar,
-        type = 'group',
-        args = {
-            general = {
-                name = GENERAL_LABEL,
-                type = "group",
-                args = {general = self:GetGeneralOptions()}
-            }, -- general
-            modules = {name = L['Modules'], type = "group", args = {}}, -- modules
-            changelog = {
-                type = "group",
-                childGroups = "select",
-                name = L["Changelog"],
-                args = {}
-            }
-        }
-    }
-
-    local function orange(string)
-        if type(string) ~= "string" then string = tostring(string) end
-
-        string = XIVBar:CreateColorString(string,
-                                          {r = 0.859, g = 0.388, b = 0.203})
-        return string
-    end
-
-    local function renderChangelogLine(line)
-        line = gsub(line, "%[[^%[]+%]", orange)
-        return line
-    end
-
-    for version, data in pairs(XIVBar.Changelog) do
-        local versionString = data.version_string
-        local dateTable = {strsplit("/", data.release_date)}
-        local dateString = data.release_date
-        if #dateTable == 3 then
-            dateString = L["%month%-%day%-%year%"]
-            dateString = gsub(dateString, "%%year%%", dateTable[1])
-            dateString = gsub(dateString, "%%month%%", dateTable[2])
-            dateString = gsub(dateString, "%%day%%", dateTable[3])
-        end
-
-        options.args.changelog.args[tostring(version)] = {
-            order = 10000 - version,
-            name = versionString,
-            type = "group",
-            args = {
-                version = {
-                    order = 2,
-                    type = "description",
-                    name = L["Version"] .. " " .. orange(versionString) ..
-                        " - |cffbbbbbb" .. dateString .. "|r",
-                    fontSize = "large"
-                }
-            }
-        }
-
-        local page = options.args.changelog.args[tostring(version)].args
-
-        -- Checking localized "Important" category
-        local important_localized = {}
-        if data.important[GetLocale()] ~= nil and next(data.important[GetLocale()]) ~= nil then
-            important_localized = data.important[GetLocale()]
-        else 
-            important_localized = data.important["enUS"]
-        end
-
-        local important = data.important and important_localized
-        if important and #important > 0 then
-            page.importantHeader = {
-                order = 3,
-                type = "header",
-                name = orange(L["Important"])
-            }
-            page.important = {
-                order = 4,
-                type = "description",
-                name = function()
-                    local text = ""
-                    for index, line in ipairs(important) do
-                        text = text .. index .. ". " ..
-                                   renderChangelogLine(line) .. "\n"
-                    end
-                    return text .. "\n"
-                end,
-                fontSize = "medium"
-            }
-        end
-
-        -- Checking localized "New" category
-        local new_localized = {}
-        if data.new[GetLocale()] ~= nil and next(data.new[GetLocale()]) ~= nil then
-            new_localized = data.new[GetLocale()]
-        else 
-            new_localized = data.new["enUS"]
-        end
-
-        local new = data.new and new_localized
-        if new and #new > 0 then
-            page.newHeader = {
-                order = 5,
-                type = "header",
-                name = orange(L["New"])
-            }
-            page.new = {
-                order = 6,
-                type = "description",
-                name = function()
-                    local text = ""
-                    for index, line in ipairs(new) do
-                        text = text .. index .. ". " ..
-                                   renderChangelogLine(line) .. "\n"
-                    end
-                    return text .. "\n"
-                end,
-                fontSize = "medium"
-            }
-        end
-
-        -- Checking localized "Improvment" category
-        local improvment_localized = {}
-        if data.improvment[GetLocale()] ~= nil and next(data.improvment[GetLocale()]) ~= nil then
-            improvment_localized = data.improvment[GetLocale()]
-        else 
-            improvment_localized = data.improvment["enUS"]
-        end
-
-        local improvment = data.improvment and improvment_localized
-        if improvment and #improvment > 0 then
-            page.improvmentHeader = {
-                order = 7,
-                type = "header",
-                name = orange(L["Improvment"])
-            }
-            page.improvment = {
-                order = 8,
-                type = "description",
-                name = function()
-                    local text = ""
-                    for index, line in ipairs(improvment) do
-                        text = text .. index .. ". " ..
-                                   renderChangelogLine(line) .. "\n"
-                    end
-                    return text .. "\n"
-                end,
-                fontSize = "medium"
-            }
-        end
-    end
-
-    for name, module in self:IterateModules() do
-        if module['GetConfig'] ~= nil then
-            options.args.modules.args[name] = module:GetConfig()
-        end
-        if module['GetDefaultOptions'] ~= nil then
-            local oName, oTable = module:GetDefaultOptions()
-            self.defaults.profile.modules[oName] = oTable
-        end
-    end
-
+    self:SetupOptions()
+    -- Module defaults are appended in SetupOptions; re-register so AceDB copies them
+    -- into already-initialized sections and strips them correctly on logout.
     self.db:RegisterDefaults(self.defaults)
-
-    AceConfig:RegisterOptionsTable(AddOnName, options)
-    AceConfigDialog:AddToBlizOptions(AddOnName, "XIV Bar Continued", nil, "general")
-    AceConfigDialog:AddToBlizOptions(AddOnName, L['Modules'], "XIV Bar Continued", "modules")
-    AceConfigDialog:AddToBlizOptions(AddOnName, L['Changelog'], "XIV Bar Continued", "changelog")
-
-    options.args.profiles = LibStub("AceDBOptions-3.0"):GetOptionsTable(self.db)
-    AceConfigDialog:AddToBlizOptions(AddOnName, 'Profiles', "XIV Bar Continued", "profiles")
 
     self.timerRefresh = false
 
     self:RegisterChatCommand('xivc', 'ToggleConfig')
     self:RegisterChatCommand('xivbar', 'ToggleConfig')
     self:RegisterChatCommand('xbc', 'ToggleConfig')
+
+    -- Defer so the chat frame is ready (OnInitialize is too early for reliable chat).
+    local function printStartupChatMessages()
+        if self.PrintLoadMessage then
+            self:PrintLoadMessage()
+        end
+        if self.MaybeAnnounceAddonUpdate then
+            self:MaybeAnnounceAddonUpdate()
+        end
+    end
+    if C_Timer and C_Timer.After then
+        C_Timer.After(2, printStartupChatMessages)
+    else
+        printStartupChatMessages()
+    end
+end
+
+local function AddChatMessage(message)
+    if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+        DEFAULT_CHAT_FRAME:AddMessage(message)
+    else
+        print(message)
+    end
+end
+
+function XIVBar:GetChatPrefix()
+    return "|cffffd100XIV Databar|r |cffb0b0b0Continued|r"
+end
+
+function XIVBar.ColorizeCommands(_, text)
+    if type(text) ~= "string" then return text end
+    local out = {}
+    local index = 1
+    while true do
+        local startPos, endPos, cmd = text:find("(/%w+)", index)
+        if not startPos then
+            table.insert(out, text:sub(index))
+            break
+        end
+        table.insert(out, text:sub(index, startPos - 1))
+        table.insert(out, "|cffffd100" .. cmd .. "|r")
+        index = endPos + 1
+    end
+    return table.concat(out)
+end
+
+function XIVBar:PrintLoadMessage()
+    if not (self.db and self.db.profile and self.db.profile.general) then return end
+    if self.db.profile.general.disableLoginMessage then return end
+
+    local prefix = self:GetChatPrefix()
+    local body = self:ColorizeCommands(
+        L["ADDON_LOADED_MSG"] or "loaded, type /xivc to open settings."
+    )
+    AddChatMessage(prefix .. " " .. body)
+end
+
+function XIVBar:OpenChangelogCategory()
+    local settings = _G["Settings"]
+    local openLegacyCategory = _G["InterfaceOptionsFrame_OpenToCategory"]
+    local category = self.changelogCategory or self.optionsCategory or "XIV Databar Continued"
+
+    if settings and settings.OpenToCategory then
+        settings.OpenToCategory(category)
+    elseif openLegacyCategory then
+        openLegacyCategory(category)
+    end
+end
+
+function XIVBar:ScheduleOpenChangelogAfterCombat()
+    if self._changelogOpenAfterCombat then return end
+    self._changelogOpenAfterCombat = true
+
+    local frame = self._changelogCombatFrame
+    if not frame then
+        frame = CreateFrame("Frame")
+        self._changelogCombatFrame = frame
+    end
+
+    frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    frame:SetScript("OnEvent", function(eventFrame, event)
+        if event ~= "PLAYER_REGEN_ENABLED" then return end
+        eventFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        eventFrame:SetScript("OnEvent", nil)
+        self._changelogOpenAfterCombat = nil
+        if self.OpenChangelogCategory then
+            self:OpenChangelogCategory()
+        end
+    end)
+end
+
+function XIVBar:HandleChangelogChatLink()
+    if InCombatLockdown() then
+        AddChatMessage(self:GetChatPrefix() .. ": " ..
+            (L["CHANGELOG_AFTER_COMBAT"] or "Changelog will open after combat ends"))
+        self:ScheduleOpenChangelogAfterCombat()
+        return
+    end
+
+    self:OpenChangelogCategory()
+end
+
+function XIVBar:MaybeAnnounceAddonUpdate()
+    if not (self.db and self.db.profile and self.db.profile.general) then return end
+
+    local currentVersion = C_AddOns.GetAddOnMetadata(AddOnName, "Version") or ""
+    -- Hotfix tags (e.g. 5.6.1-fix1): seed silently, no [Open Changelog] announce.
+    if currentVersion:lower():find("fix", 1, true) then
+        self.db.profile.general.lastChangelogAnnounce = currentVersion
+        return
+    end
+
+    local lastAnnounce = self.db.profile.general.lastChangelogAnnounce or ""
+
+    if lastAnnounce == "" then
+        -- Brand-new install: seed silently. Existing profiles: fall through and announce.
+        if not self._hadPriorInstall then
+            self.db.profile.general.lastChangelogAnnounce = currentVersion
+            return
+        end
+    elseif lastAnnounce == currentVersion then
+        return
+    end
+
+    local versionText = "|cffffd100" .. currentVersion .. "|r"
+    local linkText = "|cffdb6233[" .. (L["OPEN_CHANGELOG"] or "Open Changelog") .. "]|r"
+    local link = "|Hxivcchangelog:1|h" .. linkText .. "|h"
+    local body = (L["UPDATE_ANNOUNCE"] or "got updated to %s,"):format(versionText)
+    AddChatMessage(self:GetChatPrefix() .. " " .. body .. " " .. link)
+    self.db.profile.general.lastChangelogAnnounce = currentVersion
+end
+
+if not XIVBar._XIVC_ChangelogChatLinkHooked then
+    XIVBar._XIVC_ChangelogChatLinkHooked = true
+    hooksecurefunc("SetItemRef", function(link)
+        if type(link) ~= "string" then return end
+        local linkType = strsplit(":", link, 2)
+        if linkType ~= "xivcchangelog" then return end
+
+        if XIVBar and XIVBar.HandleChangelogChatLink then
+            XIVBar:HandleChangelogChatLink()
+        end
+    end)
+end
+
+-- Bump when the setup prompt must be shown again (e.g. after changing who gets it).
+local PROFILE_SETUP_VERSION = 4
+
+function XIVBar:GetCharacterProfileKey()
+    return self.constants.playerName .. " - " .. self.constants.playerRealm
+end
+
+function XIVBar:HasCompletedProfileSetup()
+    return (self.db.char.profileSetupVersion or 0) >= PROFILE_SETUP_VERSION
+end
+
+function XIVBar:MarkProfileSetupDone()
+    self.db.char.profileSetupVersion = PROFILE_SETUP_VERSION
+    -- Clear the early boolean flag that could silently suppress the Default prompt.
+    self.db.char.profileSetupDone = nil
+    self.profileSetupPending = nil
+end
+
+function XIVBar:HasDefaultProfile()
+    return self.db.profiles and rawget(self.db.profiles, "Default") ~= nil
+end
+
+function XIVBar:GetSharedProfileForCopy()
+    local pending = self.profileSetupPending
+    local charKey = (pending and pending.charKey) or self:GetCharacterProfileKey()
+    local candidate = pending and pending.preferred
+    if candidate and candidate ~= charKey then
+        return candidate
+    end
+    if self:HasDefaultProfile() then
+        return "Default"
+    end
+    return nil
+end
+
+-- copyShared: nil/false = blank personal profile; true = personal profile copied from shared/Default.
+function XIVBar:CreatePersonalProfileFromSetup(copyShared)
+    local pending = self.profileSetupPending
+    local charKey = (pending and pending.charKey) or self:GetCharacterProfileKey()
+    local baseProfile = copyShared and self:GetSharedProfileForCopy() or nil
+
+    self:MarkProfileSetupDone()
+
+    if self.db:GetCurrentProfile() ~= charKey then
+        self.db:SetProfile(charKey)
+    end
+
+    if copyShared and baseProfile and baseProfile ~= charKey then
+        self.db:CopyProfile(baseProfile, true)
+    else
+        self.db:ResetProfile()
+    end
+end
+
+function XIVBar:UseSharedDefaultFromSetup()
+    self:MarkProfileSetupDone()
+    if self.db:GetCurrentProfile() ~= "Default" then
+        self.db:SetProfile("Default")
+    end
+end
+
+function XIVBar:MaybeShowProfileSetupPrompt()
+    if not self.db or self:HasCompletedProfileSetup() then
+        return
+    end
+
+    local charKey = self:GetCharacterProfileKey()
+    local current = self.db:GetCurrentProfile()
+
+    if current == "Default" then
+        -- Legacy shared profile: full migration dialog.
+        self.profileSetupPending = {
+            mode = "migrate",
+            preferred = "Default",
+            sourceProfile = current,
+            charKey = charKey,
+            isLegacyDefault = true,
+        }
+        self:ShowProfileSetupDialog("migrate")
+        return
+    end
+
+    if current == charKey and self:HasDefaultProfile() then
+        -- New character on a blank personal profile: offer shared Default or stay fresh.
+        self.profileSetupPending = {
+            mode = "newchar",
+            preferred = "Default",
+            sourceProfile = current,
+            charKey = charKey,
+        }
+        self:ShowProfileSetupDialog("newchar")
+        return
+    end
+
+    -- Custom profile, or first character with no Default yet.
+    self:MarkProfileSetupDone()
+end
+
+function XIVBar:CreateMainBar()
+    if self.frames.bar == nil then
+        local bar = CreateFrame("FRAME", "XIV_Databar", UIParent)
+        self:RegisterFrame('bar', bar)
+        self.frames.bgTexture = self.frames.bgTexture or bar:CreateTexture(nil, "BACKGROUND")
+
+        -- Create guide lines
+        local guides = CreateFrame("FRAME", nil, UIParent)
+        guides:SetAllPoints()
+        guides:Hide()
+
+        -- Vertical center line
+        local centerLine = guides:CreateTexture(nil, "OVERLAY")
+        centerLine:SetColorTexture(1, 1, 1, 0.3)
+        centerLine:SetWidth(2)
+        centerLine:SetPoint("TOP", UIParent, "TOP", 0, 0)
+        centerLine:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 0)
+
+        -- Horizontal center line
+        local hCenterLine = guides:CreateTexture(nil, "OVERLAY")
+        hCenterLine:SetColorTexture(1, 1, 1, 0.3)
+        hCenterLine:SetHeight(2)
+        hCenterLine:SetPoint("LEFT", UIParent, "LEFT", 0, 0)
+        hCenterLine:SetPoint("RIGHT", UIParent, "RIGHT", 0, 0)
+
+        -- Edge markers
+        local edgeMarkerSize = 40
+        local edgeMarkerThickness = 2
+
+        -- Top edge markers
+        local topLeft = guides:CreateTexture(nil, "OVERLAY")
+        topLeft:SetColorTexture(1, 1, 1, 0.3)
+        topLeft:SetSize(edgeMarkerSize, edgeMarkerThickness)
+        topLeft:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
+
+        local topRight = guides:CreateTexture(nil, "OVERLAY")
+        topRight:SetColorTexture(1, 1, 1, 0.3)
+        topRight:SetSize(edgeMarkerSize, edgeMarkerThickness)
+        topRight:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", 0, 0)
+
+        -- Bottom edge markers
+        local bottomLeft = guides:CreateTexture(nil, "OVERLAY")
+        bottomLeft:SetColorTexture(1, 1, 1, 0.3)
+        bottomLeft:SetSize(edgeMarkerSize, edgeMarkerThickness)
+        bottomLeft:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0)
+
+        local bottomRight = guides:CreateTexture(nil, "OVERLAY")
+        bottomRight:SetColorTexture(1, 1, 1, 0.3)
+        bottomRight:SetSize(edgeMarkerSize, edgeMarkerThickness)
+        bottomRight:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 0, 0)
+
+        -- Vertical edge markers
+        local leftTop = guides:CreateTexture(nil, "OVERLAY")
+        leftTop:SetColorTexture(1, 1, 1, 0.3)
+        leftTop:SetSize(edgeMarkerThickness, edgeMarkerSize)
+        leftTop:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
+
+        local leftBottom = guides:CreateTexture(nil, "OVERLAY")
+        leftBottom:SetColorTexture(1, 1, 1, 0.3)
+        leftBottom:SetSize(edgeMarkerThickness, edgeMarkerSize)
+        leftBottom:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0)
+
+        local rightTop = guides:CreateTexture(nil, "OVERLAY")
+        rightTop:SetColorTexture(1, 1, 1, 0.3)
+        rightTop:SetSize(edgeMarkerThickness, edgeMarkerSize)
+        rightTop:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", 0, 0)
+
+        local rightBottom = guides:CreateTexture(nil, "OVERLAY")
+        rightBottom:SetColorTexture(1, 1, 1, 0.3)
+        rightBottom:SetSize(edgeMarkerThickness, edgeMarkerSize)
+        rightBottom:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 0, 0)
+
+        self.frames.guides = guides
+
+        -- Set initial frame level instead of strata
+        bar:SetFrameLevel(1)
+
+        -- Make the bar movable
+        bar:SetMovable(true)
+        bar:EnableMouse(true)
+        bar:RegisterForDrag("LeftButton")
+
+        -- Snap threshold in pixels
+        local SNAP_THRESHOLD = 20
+
+        -- Helper function to check if a value is within the snap threshold
+        local function IsWithinThreshold(value, target, threshold)
+            return math.abs(value - target) <= threshold
+        end
+
+        -- Helper function to get the center coordinates of the bar
+        local function GetBarCenter(frame)
+            local width, height = frame:GetSize()
+            local x, y = frame:GetCenter()
+            return x, y, width, height
+        end
+
+        -- Helper function to snap to nearest point if within threshold
+        local function GetSnappedPosition(frame)
+            local screenWidth, screenHeight = UIParent:GetWidth(), UIParent:GetHeight()
+            local centerX, centerY, barWidth = GetBarCenter(frame)
+            local point
+            local xOffset
+            local yOffset
+            local snapped = false
+
+            -- Check horizontal position
+            if IsWithinThreshold(centerX, screenWidth/2, SNAP_THRESHOLD) then
+                point = "CENTER"
+                xOffset = 0
+                snapped = true
+            elseif IsWithinThreshold(centerX - barWidth/2, 0, SNAP_THRESHOLD) then
+                point = "LEFT"
+                xOffset = 0
+                snapped = true
+            elseif IsWithinThreshold(centerX + barWidth/2, screenWidth, SNAP_THRESHOLD) then
+                point = "RIGHT"
+                xOffset = 0
+                snapped = true
+            else
+                point = "CENTER"
+                xOffset = centerX - screenWidth/2
+            end
+
+            -- Check vertical position
+            if IsWithinThreshold(centerY, 0, SNAP_THRESHOLD) then
+                yOffset = 0
+                point = "BOTTOM" .. (point ~= "CENTER" and point or "")
+                snapped = true
+            elseif IsWithinThreshold(centerY, screenHeight, SNAP_THRESHOLD) then
+                yOffset = 0
+                point = "TOP" .. (point ~= "CENTER" and point or "")
+                snapped = true
+            else
+                yOffset = centerY - screenHeight/2
+            end
+
+            return point, point, xOffset, yOffset, snapped
+        end
+
+        bar:SetScript("OnDragStart", function(frame)
+            if not XIVBar.db.profile.general.locked and not XIVBar.db.profile.general.barFullscreen then
+                frame:StartMoving()
+                XIVBar.frames.guides:Show()
+            end
+        end)
+
+        bar:SetScript("OnDragStop", function(frame)
+            if not XIVBar.db.profile.general.barFullscreen then
+                frame:StopMovingOrSizing()
+                XIVBar.frames.guides:Hide()
+
+                -- Get final position with snapping
+                local point, relativePoint, xOffset, yOffset = GetSnappedPosition(frame)
+
+                -- Save position
+                XIVBar.db.profile.general.point = point
+                XIVBar.db.profile.general.relativePoint = relativePoint
+                XIVBar.db.profile.general.xOffset = xOffset
+                XIVBar.db.profile.general.yOffset = yOffset
+
+                -- Apply position
+                frame:ClearAllPoints()
+                frame:SetPoint(point, UIParent, relativePoint, xOffset, yOffset)
+
+                XIVBar:Refresh()
+            end
+        end)
+    end
+end
+
+function XIVBar:ResetUI()
+    if UIParent_UpdateTopFramePositions then
+        UIParent_UpdateTopFramePositions()
+    end
 end
 
 function XIVBar:OnEnable()
@@ -281,6 +487,12 @@ function XIVBar:OnEnable()
     self.db.RegisterCallback(self, 'OnProfileChanged', 'Refresh')
     self.db.RegisterCallback(self, 'OnProfileReset', 'Refresh')
 
+    C_Timer.After(1, function()
+        if XIVBar and XIVBar.db then
+            XIVBar:MaybeShowProfileSetupPrompt()
+        end
+    end)
+
     if not self.timerRefresh then
         C_Timer.After(5, function()
             self:Refresh()
@@ -290,7 +502,21 @@ function XIVBar:OnEnable()
 end
 
 function XIVBar:ToggleConfig()
-    Settings.OpenToCategory("XIV Bar Continued")
+    local settings = _G["Settings"]
+    local openLegacyCategory = _G["InterfaceOptionsFrame_OpenToCategory"]
+
+    if settings and settings.OpenToCategory then
+        if self.optionsCategory then
+            settings.OpenToCategory(self.optionsCategory)
+        else
+            settings.OpenToCategory("XIV Bar Continued")
+        end
+    elseif openLegacyCategory then
+        local category = self.optionsCategory or "XIV Bar Continued"
+        openLegacyCategory(category)
+    else
+        self:Print("Impossible d'ouvrir les options sur cette version du client.")
+    end
 end
 
 function XIVBar:SetColor(name, r, g, b, a)
@@ -304,32 +530,60 @@ end
 
 function XIVBar:GetColor(name)
     local profile = self.db.profile.color
-    local a = profile[name].a
-    -- what a stupid hacky solution, the whole config part is kind of fucked and i dread having to come fix this eventually.
-    -- feel like just burning it all down and writing something from scratch when seeing shit like this. terrible library.
-    if name == 'normal' then
-        -- use class color for normal color
-        if profile.useTextCC then
-            local r, g, b = self:GetClassColors()
-            return r, g, b, a
-        end
+    local r, g, b, a = profile[name].r, profile[name].g, profile[name].b, profile[name].a
+
+    if name == 'normal' and profile.useTextCC then
+        r, g, b = self:GetClassColors()
+    elseif name == 'barColor' and profile.useCC then
+        r, g, b = self:GetClassColors()
+    elseif name == 'hover' and profile.useHoverCC then
+        r, g, b = self:GetClassColors()
     end
-    -- use self-picked color for normal color
-    return profile[name].r, profile[name].g, profile[name].b, a
+
+    return r, g, b, a or 1
+end
+
+-- Pass nil year for SHORTDATENOYEAR (calendar/lockout dates without year).
+function XIVBar:FormatLocalizedDate(day, month, year)
+    day, month = tonumber(day), tonumber(month)
+    if not (day and month) then
+        return nil
+    end
+    if year ~= nil then
+        year = tonumber(year)
+        if not year then
+            return nil
+        end
+        return FormatShortDate(day, month, year)
+    end
+    return FormatShortDate(day, month)
+end
+
+-- Accept YYYY-MM-DD or YYYY/MM/DD
+function XIVBar:FormatLocalizedDateString(dateString)
+    if type(dateString) ~= "string" then
+        return dateString
+    end
+    local y, m, d = dateString:match("^(%d%d%d%d)[%-%/](%d%d)[%-%/](%d%d)$")
+    if not y then
+        return dateString
+    end
+    return self:FormatLocalizedDate(d, m, y) or dateString
 end
 
 function XIVBar:HoverColors()
     local colors
     local profile = self.db.profile.color
+    local hoverAlpha = profile.hover.a or 1
     -- use self-picked color for hover color
     if not profile.useHoverCC then
         colors = {
-            profile.hover.r, profile.hover.g, profile.hover.b, profile.hover.a
+            profile.hover.r, profile.hover.g, profile.hover.b, hoverAlpha
         }
         -- use class color for hover color
     else
         local r, g, b = self:GetClassColors()
-        colors = {r, g, b, profile.hover.a}
+        colors = {r, g, b, hoverAlpha}
     end
     return colors
 end
@@ -342,19 +596,95 @@ function XIVBar:RegisterFrame(name, frame)
     self.frames[name] = frame
 end
 
+function XIVBar:RegisterMouseoverHoldFrame(frame, keepVisibleWhileShown)
+    if not frame then
+        return
+    end
+    self.mouseoverHoldFrames = self.mouseoverHoldFrames or {}
+    self.mouseoverHoldFrames[frame] = true
+    frame._xivKeepVisibleWhileShown = (keepVisibleWhileShown ~= false)
+end
+
+function XIVBar:GetPopupDismissLayer()
+    if self.popupDismissLayer then
+        return self.popupDismissLayer
+    end
+
+    local layer = CreateFrame("BUTTON", nil, UIParent)
+    layer:SetAllPoints(UIParent)
+    layer:Hide()
+    layer:EnableMouse(true)
+    layer:RegisterForClicks("AnyUp", "AnyDown")
+    layer:SetFrameStrata("TOOLTIP")
+    layer:SetFrameLevel(1)
+    layer:SetScript("OnClick", function()
+        XIVBar:HideActivePopup()
+    end)
+
+    self.popupDismissLayer = layer
+    return layer
+end
+
+function XIVBar:ShowPopup(popup)
+    if not popup then
+        return
+    end
+
+    local layer = self:GetPopupDismissLayer()
+    if self.activePopup and self.activePopup ~= popup and self.activePopup.Hide then
+        self.activePopup:Hide()
+    end
+
+    self.activePopup = popup
+
+    if not popup._xivPopupAutoCloseHooked then
+        popup._xivPopupAutoCloseHooked = true
+        popup:HookScript("OnHide", function(frame)
+            if XIVBar.activePopup == frame then
+                XIVBar.activePopup = nil
+                if XIVBar.popupDismissLayer then
+                    XIVBar.popupDismissLayer:Hide()
+                end
+            end
+        end)
+    end
+
+    layer:ClearAllPoints()
+    layer:SetAllPoints(UIParent)
+    layer:SetFrameStrata(popup:GetFrameStrata() or "TOOLTIP")
+    local popupLevel = popup:GetFrameLevel() or 1
+    layer:SetFrameLevel(math.max(1, popupLevel - 1))
+    layer:Show()
+    popup:Show()
+end
+
+function XIVBar:HidePopup(popup)
+    if not popup then
+        return
+    end
+    popup:Hide()
+    if self.activePopup == popup then
+        self.activePopup = nil
+        if self.popupDismissLayer then
+            self.popupDismissLayer:Hide()
+        end
+    end
+end
+
+function XIVBar:HideActivePopup()
+    if self.activePopup and self.activePopup.Hide then
+        self.activePopup:Hide()
+        return
+    end
+    if self.popupDismissLayer then
+        self.popupDismissLayer:Hide()
+    end
+end
+
 --- Get the frame with the specified name
 ---@param name string name of the frame as supplied to RegisterFrame
 ---@return Frame
 function XIVBar:GetFrame(name) return self.frames[name] end
-
-function XIVBar:CreateMainBar()
-    if self.frames.bar == nil then
-        self:RegisterFrame('bar', CreateFrame("FRAME", "XIV_Databar", UIParent))
-        self.frames.bgTexture = self.frames.bgTexture or
-                                    self.frames.bar:CreateTexture(nil,
-                                                                  "BACKGROUND")
-    end
-end
 
 function XIVBar:HideBarEvent()
     local bar = self:GetFrame("bar")
@@ -366,9 +696,26 @@ function XIVBar:HideBarEvent()
     bar:RegisterEvent("PET_BATTLE_CLOSE")
     bar:RegisterEvent("TAXIMAP_CLOSED")
     bar:RegisterEvent("VEHICLE_POWER_SHOW")
+    bar:RegisterEvent("PLAYER_ENTERING_WORLD")
+    bar:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 
-    bar:SetScript("OnEvent", function(_, event, ...)
+    bar:SetScript("OnEvent", function(_, event)
         local barFrame = XIVBar:GetFrame("bar")
+
+        -- Handle zone changes and instance transitions
+        if event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
+            C_Timer.After(0.5, function()
+                if not barFrame:IsVisible() then
+                    barFrame:Show()
+                end
+                -- Full refresh of the bar and modules
+                XIVBar:Refresh()
+                -- Force update module positions
+                XIVBar:ResetUI()
+            end)
+            return
+        end
+
         if self.db.profile.general.barFlightHide then
             if event == "VEHICLE_POWER_SHOW" then
                 if not barFrame:IsVisible() then barFrame:Show() end
@@ -397,13 +744,15 @@ function XIVBar:HideBarEvent()
         bar:RegisterEvent("PLAYER_REGEN_ENABLED")
         bar:RegisterEvent("PLAYER_REGEN_DISABLED")
 
-        bar:HookScript("OnEvent", function(_, event, ...)
+        bar:HookScript("OnEvent", function(_, event)
             local barFrame = XIVBar:GetFrame("bar")
             if event == "PLAYER_REGEN_DISABLED" and barFrame:IsVisible() then
                 barFrame:Hide()
             end
             if event == "PLAYER_REGEN_ENABLED" and not barFrame:IsVisible() then
                 barFrame:Show()
+                -- Refresh modules when showing after combat
+                XIVBar:Refresh()
             end
         end)
     else
@@ -426,39 +775,58 @@ function XIVBar:Refresh()
     self:HideBarEvent()
     self.miniTextPosition = "TOP"
     if self.db.profile.general.barPosition == 'TOP' then
-        hooksecurefunc("UIParent_UpdateTopFramePositions", function(self)
-            if (XIVBar.db.profile.general.barPosition == 'TOP') then
-                OffsetUI()
-            end
-        end)
-        OffsetUI()
         self.miniTextPosition = 'BOTTOM'
     else
         self:ResetUI();
     end
 
-    local barColor = self.db.profile.color.barColor
-    self.frames.bar:ClearAllPoints()
-    self.frames.bar:SetPoint(self.db.profile.general.barPosition)
-    if self.db.profile.general.barFullscreen then
-        self.frames.bar:SetPoint("LEFT", self.db.profile.general.barMargin, 0)
-        self.frames.bar:SetPoint("RIGHT", -self.db.profile.general.barMargin, 0)
-    else
-        local relativePoint = self.db.profile.general.barHoriz
-        if relativePoint == 'CENTER' then relativePoint = 'BOTTOM' end
-        self.frames.bar:SetPoint(self.db.profile.general.barHoriz,
-                                 self.frames.bar:GetParent(), relativePoint)
-        self.frames.bar:SetWidth(self.db.profile.general.barWidth)
+    if not InCombatLockdown() then
+        self.frames.bar:ClearAllPoints()
     end
-    self.frames.bar:SetHeight(self:GetHeight())
 
-    self.frames.bgTexture:SetColorTexture(self:GetColor('barColor'))
-    self.frames.bgTexture:SetAllPoints()
+    -- Use saved position if not in fullscreen mode
+    if not self.db.profile.general.barFullscreen then
+        -- If we have a saved custom position, use it
+        if self.db.profile.general.point then
+            self.frames.bar:SetPoint(
+                self.db.profile.general.point,
+                UIParent,
+                self.db.profile.general.relativePoint,
+                self.db.profile.general.xOffset,
+                self.db.profile.general.yOffset
+            )
+        else
+            -- Initial position based on barHoriz and barPosition
+            self.frames.bar:SetPoint(self.db.profile.general.barPosition, UIParent, self.db.profile.general.barPosition)
+            if self.db.profile.general.barHoriz == 'LEFT' then
+                self.frames.bar:SetPoint("LEFT", UIParent, "LEFT", self.db.profile.general.barMargin, 0)
+            elseif self.db.profile.general.barHoriz == 'RIGHT' then
+                self.frames.bar:SetPoint("RIGHT", UIParent, "RIGHT", -self.db.profile.general.barMargin, 0)
+            else -- CENTER
+                self.frames.bar:SetPoint(self.db.profile.general.barHoriz, UIParent, self.db.profile.general.barHoriz, 0, 0)
+            end
+        end
+        self.frames.bar:SetWidth(self.db.profile.general.barWidth)
+    else
+        if not InCombatLockdown() then
+            self.frames.bar:SetPoint(self.db.profile.general.barPosition)
+            self.frames.bar:SetPoint("LEFT", self.db.profile.general.barMargin, 0)
+            self.frames.bar:SetPoint("RIGHT", -self.db.profile.general.barMargin, 0)
+        end
+    end
 
-    for name, module in self:IterateModules() do
+    if not InCombatLockdown() then
+        self.frames.bar:SetHeight(self:GetHeight())
+        self.frames.bgTexture:SetColorTexture(self:GetColor('barColor'))
+        self.frames.bgTexture:SetAllPoints()
+    end
+
+    for _, module in self:IterateModules() do
         if module['Refresh'] == nil then return; end
         module:Refresh()
     end
+
+    self:UpdateMouseoverScripts()
 end
 
 function XIVBar:GetFont(size)
@@ -473,450 +841,203 @@ function XIVBar:GetClassColors()
            self.db.profile.color.barColor.a
 end
 
-function XIVBar:RGBAToHex(r, g, b, a)
-    a = a or 1
-    r = r <= 1 and r >= 0 and r or 0
-    g = g <= 1 and g >= 0 and g or 0
-    b = b <= 1 and b >= 0 and b or 0
-    a = a <= 1 and a >= 0 and a or 1
-    return string.format("%02x%02x%02x%02x", r * 255, g * 255, b * 255, a * 255)
-end
+function XIVBar:UpdateMouseoverScripts()
+    local bar = XIVBar.frames and XIVBar.frames.bar
+    if not bar then return end
 
-function XIVBar:HexToRGBA(hex)
-    local rhex, ghex, bhex, ahex = string.sub(hex, 1, 2), string.sub(hex, 3, 4),
-                                   string.sub(hex, 5, 6), string.sub(hex, 7, 8)
-    if not (rhex and ghex and bhex and ahex) then return 0, 0, 0, 0 end
-    return (tonumber(rhex, 16) / 255), (tonumber(ghex, 16) / 255),
-           (tonumber(bhex, 16) / 255), (tonumber(ahex, 16) / 255)
-end
-
-function XIVBar:PrintTable(table, prefix)
-    for k, v in pairs(table) do
-        if type(v) == 'table' then
-            self:PrintTable(v, prefix .. '.' .. k)
-        else
-            print(prefix .. '.' .. k .. ': ' .. tostring(v))
+    local function IsMouseOverBar()
+        if bar:IsMouseOver() then
+            return true
         end
+
+        if XIVBar.mouseoverHoldFrames then
+            for frame in pairs(XIVBar.mouseoverHoldFrames) do
+                if frame then
+                    local isShown = frame.IsShown and frame:IsShown()
+                    local isVisible = frame.IsVisible and frame:IsVisible()
+                    if isShown and isVisible then
+                        if frame:IsMouseOver() or frame._xivKeepVisibleWhileShown then
+                            return true
+                        end
+                    end
+                end
+            end
+        end
+
+        return false
+    end
+
+    local function IsBarChild(frame)
+        local parent = frame and frame:GetParent()
+        while parent do
+            if parent == bar then
+                return true
+            end
+            parent = parent:GetParent()
+        end
+        return false
+    end
+
+    local function EnsureMouseoverAnimations()
+        if bar._xivFadeInGroup and bar._xivFadeOutGroup then
+            return
+        end
+
+        bar._xivFadeInGroup = bar:CreateAnimationGroup()
+        bar._xivFadeIn = bar._xivFadeInGroup:CreateAnimation("Alpha")
+        bar._xivFadeIn:SetOrder(1)
+        bar._xivFadeIn:SetDuration(0.15)
+        bar._xivFadeInGroup:SetScript("OnFinished", function()
+            bar:SetAlpha(1)
+        end)
+
+        bar._xivFadeOutGroup = bar:CreateAnimationGroup()
+        bar._xivFadeOut = bar._xivFadeOutGroup:CreateAnimation("Alpha")
+        bar._xivFadeOut:SetOrder(1)
+        bar._xivFadeOut:SetDuration(0.15)
+        bar._xivFadeOutGroup:SetScript("OnFinished", function()
+            bar:SetAlpha(0)
+        end)
+    end
+
+    local function PlayAlpha(group, anim, fromAlpha, toAlpha)
+        if group:IsPlaying() then
+            group:Stop()
+        end
+        anim:SetFromAlpha(fromAlpha)
+        anim:SetToAlpha(toAlpha)
+        group:Play()
+    end
+
+    local showBar
+    local hideBarIfOut
+
+    local function HookMouseoverFrame(frame)
+        if not (frame and frame.EnableMouse) then
+            return
+        end
+        if frame._xivMouseoverHooksInstalled then
+            return
+        end
+
+        frame:EnableMouse(true)
+
+        if frame._xivKeepVisibleWhileShown then
+            frame._xivMouseoverHooksInstalled = true
+            return
+        end
+
+        if not frame.HookScript then
+            return
+        end
+
+        frame._xivMouseoverHooksInstalled = true
+        frame:HookScript('OnEnter', showBar)
+        frame:HookScript('OnLeave', hideBarIfOut)
+    end
+
+    showBar = function()
+        bar._xivHidePending = false
+        if not bar._xivMouseoverEnabled then
+            return
+        end
+        if bar._xivMouseoverVisible then
+            return
+        end
+
+        EnsureMouseoverAnimations()
+        if bar._xivFadeOutGroup and bar._xivFadeOutGroup:IsPlaying() then
+            bar._xivFadeOutGroup:Stop()
+        end
+
+        bar._xivMouseoverVisible = true
+        PlayAlpha(bar._xivFadeInGroup, bar._xivFadeIn, bar:GetAlpha(), 1)
+    end
+
+    hideBarIfOut = function()
+        -- Petit délai pour laisser le curseur passer d'un enfant à l'autre sans clignoter
+        if bar._xivHidePending then return end
+        bar._xivHidePending = true
+        bar._xivHideToken = (bar._xivHideToken or 0) + 1
+        local token = bar._xivHideToken
+        C_Timer.After(0.12, function()
+            bar._xivHidePending = false
+            if token ~= bar._xivHideToken then
+                return
+            end
+            if not bar._xivMouseoverEnabled then
+                return
+            end
+            if not IsMouseOverBar() then
+                EnsureMouseoverAnimations()
+                if bar._xivFadeInGroup and bar._xivFadeInGroup:IsPlaying() then
+                    bar._xivFadeInGroup:Stop()
+                end
+
+                bar._xivMouseoverVisible = false
+                PlayAlpha(bar._xivFadeOutGroup, bar._xivFadeOut, bar:GetAlpha(), 0)
+            end
+        end)
+    end
+
+    if XIVBar.db and XIVBar.db.profile and XIVBar.db.profile.general.showOnMouseover then
+        bar._xivMouseoverEnabled = true
+        bar._xivMouseoverVisible = false
+        bar._xivHidePending = false
+        bar:SetAlpha(0)
+        bar:SetScript('OnEnter', showBar)
+        bar:SetScript('OnLeave', hideBarIfOut)
+        bar:SetScript('OnUpdate', function(frame, elapsed)
+            frame._xivMouseoverElapsed = (frame._xivMouseoverElapsed or 0) + elapsed
+            if frame._xivMouseoverElapsed < 0.05 then return end
+            frame._xivMouseoverElapsed = 0
+            if not bar._xivMouseoverEnabled then
+                return
+            end
+            if IsMouseOverBar() then
+                showBar()
+            else
+                hideBarIfOut()
+            end
+        end)
+        -- Apply the same handlers to all registered module frames so the bar stays visible when hovering them
+        if XIVBar.frames then
+            for _, frame in pairs(XIVBar.frames) do
+                if frame and frame ~= bar and frame.EnableMouse and frame.HookScript and IsBarChild(frame) then
+                    HookMouseoverFrame(frame)
+                end
+            end
+        end
+        if XIVBar.mouseoverHoldFrames then
+            for frame in pairs(XIVBar.mouseoverHoldFrames) do
+                if frame and frame ~= bar then
+                    HookMouseoverFrame(frame)
+                end
+            end
+        end
+    else
+        bar._xivMouseoverEnabled = false
+        bar._xivHideToken = (bar._xivHideToken or 0) + 1
+        if bar._xivFadeInGroup and bar._xivFadeInGroup:IsPlaying() then
+            bar._xivFadeInGroup:Stop()
+        end
+        if bar._xivFadeOutGroup and bar._xivFadeOutGroup:IsPlaying() then
+            bar._xivFadeOutGroup:Stop()
+        end
+        bar._xivHidePending = false
+        bar:SetAlpha(1)
+        bar:SetScript('OnEnter', nil)
+        bar:SetScript('OnLeave', nil)
+        bar:SetScript('OnUpdate', nil)
+        bar._xivMouseoverElapsed = nil
+        bar._xivMouseoverVisible = nil
+        bar._xivHidePending = nil
     end
 end
 
-function OffsetUI()
-    local offset = XIVBar.frames.bar:GetHeight();
-    local buffsAreaTopOffset = offset;
-
-    if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
-        if (PlayerFrame and not PlayerFrame:IsUserPlaced() and
-            not PlayerFrame_IsAnimatedOut(PlayerFrame)) then
-            PlayerFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", -19,
-                                 -4 - offset)
-        end
-
-        if (TargetFrame and not TargetFrame:IsUserPlaced()) then
-            TargetFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 250,
-                                 -4 - offset);
-        end
-
-        local ticketStatusFrameShown = TicketStatusFrame and
-                                           TicketStatusFrame:IsShown();
-        local gmChatStatusFrameShown = GMChatStatusFrame and
-                                           GMChatStatusFrame:IsShown();
-        if (ticketStatusFrameShown) then
-            TicketStatusFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -180,
-                                       0 - offset);
-            buffsAreaTopOffset = buffsAreaTopOffset +
-                                     TicketStatusFrame:GetHeight();
-        end
-        if (gmChatStatusFrameShown) then
-            GMChatStatusFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -170,
-                                       -5 - offset);
-            buffsAreaTopOffset = buffsAreaTopOffset +
-                                     GMChatStatusFrame:GetHeight() + 5;
-        end
-        if (not ticketStatusFrameShown and not gmChatStatusFrameShown) then
-            buffsAreaTopOffset = buffsAreaTopOffset + 13;
-        end
-
-        BuffFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -205,
-                           0 - buffsAreaTopOffset);
+function XIVBar:ShouldShowTooltip()
+    if self.db.profile.general.disableTooltipsInCombat and InCombatLockdown() then
+        return false
     end
-end
-
-function XIVBar:ResetUI()
-    if topOffsetBlizz then UIParent_UpdateTopFramePositions = topOffsetBlizz end
-    UIParent_UpdateTopFramePositions();
-end
-
-function XIVBar:GetGeneralOptions()
-    return {
-        name = GENERAL_LABEL,
-        type = "group",
-        inline = true,
-        args = {
-            positioning = {
-                name = L["Positioning"],
-                type = "group",
-                order = 1,
-                inline = true,
-                args = {
-                    barLocation = {
-                        name = L['Bar Position'],
-                        type = "select",
-                        order = 2,
-                        width = "full",
-                        values = {TOP = L['Top'], BOTTOM = L['Bottom']},
-                        style = "dropdown",
-                        get = function()
-                            return self.db.profile.general.barPosition;
-                        end,
-                        set = function(info, value)
-                            self.db.profile.general.barPosition = value;
-                            self:Refresh();
-                        end
-                    },
-                    flightHide = {
-                        name = "Hide when in flight",
-                        type = "toggle",
-                        order = 1,
-                        get = function()
-                            return self.db.profile.general.barFlightHide
-                        end,
-                        set = function(_, val)
-                            self.db.profile.general.barFlightHide = val;
-                            self:Refresh();
-                        end
-                    },
-                    fullScreen = {
-                        name = VIDEO_OPTIONS_FULLSCREEN,
-                        type = "toggle",
-                        order = 4,
-                        get = function()
-                            return self.db.profile.general.barFullscreen;
-                        end,
-                        set = function(info, value)
-                            self.db.profile.general.barFullscreen = value;
-                            self:Refresh();
-                        end
-                    },
-                    barPosition = {
-                        name = L['Horizontal Position'],
-                        type = "select",
-                        hidden = function()
-                            return self.db.profile.general.barFullscreen;
-                        end,
-                        order = 5,
-                        values = {
-                            LEFT = L['Left'],
-                            CENTER = L['Center'],
-                            RIGHT = L['Right']
-                        },
-                        style = "dropdown",
-                        get = function()
-                            return self.db.profile.general.barHoriz;
-                        end,
-                        set = function(info, value)
-                            self.db.profile.general.barHoriz = value;
-                            self:Refresh();
-                        end,
-                        disabled = function()
-                            return self.db.profile.general.barFullscreen;
-                        end
-                    },
-                    barWidth = {
-                        name = L['Bar Width'],
-                        type = 'range',
-                        order = 6,
-                        hidden = function()
-                            return self.db.profile.general.barFullscreen;
-                        end,
-                        min = 200,
-                        max = GetScreenWidth(),
-                        step = 1,
-                        get = function()
-                            return self.db.profile.general.barWidth;
-                        end,
-                        set = function(info, val)
-                            self.db.profile.general.barWidth = val;
-                            self:Refresh();
-                        end,
-                        disabled = function()
-                            return self.db.profile.general.barFullscreen;
-                        end
-                    }
-                }
-            },
-            text = self:GetTextOptions(),
-            colors = {
-                name = L["Colors"],
-                type = "group",
-                inline = true,
-                order = 3,
-                args = {
-                    barColor = {
-                        name = L['Bar Color'],
-                        type = "color",
-                        order = 1,
-                        hasAlpha = true,
-                        set = function(info, r, g, b, a)
-                            if not self.db.profile.color.useCC then
-                                self:SetColor('barColor', r, g, b, a)
-                            else
-                                local cr, cg, cb, _ = self:GetClassColors()
-                                self:SetColor('barColor', cr, cg, cb, a)
-                            end
-                        end,
-                        get = function()
-                            return XIVBar:GetColor('barColor')
-                        end
-                    },
-                    barCC = {
-                        name = L['Use Class Color for Bar'],
-                        desc = L["Only the alpha can be set with the color picker"],
-                        type = "toggle",
-                        order = 2,
-                        set = function(info, val)
-                            XIVBar:SetColor('barColor', self:GetClassColors());
-                            self.db.profile.color.useCC = val;
-                            self:Refresh();
-                        end,
-                        get = function()
-                            return self.db.profile.color.useCC
-                        end
-                    },
-                    textColors = self:GetTextColorOptions()
-                }
-            },
-            miscellanelous = {
-                name = L["Miscellaneous"],
-                type = "group",
-                inline = true,
-                order = 3,
-                args = {
-                    barCombatHide = {
-                        name = L['Hide Bar in combat'],
-                        type = "toggle",
-                        order = 9,
-                        width = "full",
-                        get = function()
-                            return self.db.profile.general.barCombatHide;
-                        end,
-                        set = function(_, val)
-                            self.db.profile.general.barCombatHide = val;
-                            self:Refresh();
-                        end
-                    },
-                    barPadding = {
-                        name = L['Bar Padding'],
-                        type = 'range',
-                        order = 10,
-                        min = 0,
-                        max = 10,
-                        step = 1,
-                        get = function()
-                            return self.db.profile.general.barPadding;
-                        end,
-                        set = function(info, val)
-                            self.db.profile.general.barPadding = val;
-                            self:Refresh();
-                        end
-                    },
-                    moduleSpacing = {
-                        name = L['Module Spacing'],
-                        type = 'range',
-                        order = 11,
-                        min = 10,
-                        max = 80,
-                        step = 1,
-                        get = function()
-                            return self.db.profile.general.moduleSpacing;
-                        end,
-                        set = function(info, val)
-                            self.db.profile.general.moduleSpacing = val;
-                            self:Refresh();
-                        end
-                    },
-                    barMargin = {
-                        name = L['Bar Margin'],
-                        desc = L["Leftmost and rightmost margin of the bar modules"],
-                        type = 'range',
-                        order = 12,
-                        min = 0,
-                        max = 80,
-                        step = 1,
-                        get = function()
-                            return self.db.profile.general.barMargin;
-                        end,
-                        set = function(info, val)
-                            self.db.profile.general.barMargin = val;
-                            self:Refresh();
-                        end
-                    },
-                    useElvUI = {
-                        name = L['Use ElvUI for tooltips'],
-                        type = "toggle",
-                        order = 13,
-                        width = "full",
-                        get = function()
-                            return self.db.profile.general.useElvUI;
-                        end,
-                        set = function(_, val)
-                            self.db.profile.general.useElvUI = val;
-                            self:Refresh();
-                        end
-                    }
-                }
-            }
-        }
-    }
-end
-
-function XIVBar:GetTextOptions()
-    return {
-        name = LOCALE_TEXT_LABEL,
-        type = "group",
-        order = 2,
-        inline = true,
-        args = {
-            font = {
-                name = L['Font'],
-                type = "select",
-                dialogControl = 'LSM30_Font',
-                order = 1,
-                values = AceGUIWidgetLSMlists.font,
-                style = "dropdown",
-                get = function()
-                    return self.db.profile.text.font;
-                end,
-                set = function(info, val)
-                    self.db.profile.text.font = val;
-                    self:Refresh();
-                end
-            },
-            fontSize = {
-                name = FONT_SIZE,
-                type = 'range',
-                order = 2,
-                min = 10,
-                max = 40,
-                step = 1,
-                get = function()
-                    return self.db.profile.text.fontSize;
-                end,
-                set = function(info, val)
-                    self.db.profile.text.fontSize = val;
-                    self:Refresh();
-                end
-            },
-            smallFontSize = {
-                name = L['Small Font Size'],
-                type = 'range',
-                order = 2,
-                min = 10,
-                max = 20,
-                step = 1,
-                get = function()
-                    return self.db.profile.text.smallFontSize;
-                end,
-                set = function(info, val)
-                    self.db.profile.text.smallFontSize = val;
-                    self:Refresh();
-                end
-            },
-            textFlags = {
-                name = L['Text Style'],
-                type = 'select',
-                style = 'dropdown',
-                order = 3,
-                values = self.fontFlags,
-                get = function()
-                    return self.db.profile.text.flags;
-                end,
-                set = function(info, val)
-                    self.db.profile.text.flags = val;
-                    self:Refresh();
-                end
-            }
-        }
-    }
-end
-
-function XIVBar:GetTextColorOptions()
-    return {
-        name = L['Text Colors'],
-        type = "group",
-        order = 3,
-        inline = true,
-        args = {
-            normal = {
-                name = L['Normal'],
-                type = "color",
-                order = 1,
-                width = "double",
-                hasAlpha = true,
-                set = function(info, r, g, b, a)
-                    if self.db.profile.color.useTextCC then
-                        r, g, b, _ = self:GetClassColors()
-                    end
-                    XIVBar:SetColor('normal', r, g, b, a)
-                end,
-                get = function() return XIVBar:GetColor('normal') end
-            },
-            textCC = {
-                name = L["Use Class Color for Text"],
-                desc = L["Only the alpha can be set with the color picker"],
-                type = "toggle",
-                order = 2,
-                set = function(_, val)
-                    if val then
-                        XIVBar:SetColor("normal", self:GetClassColors())
-                    end
-                    self.db.profile.color.useTextCC = val
-                end,
-                get = function()
-                    return self.db.profile.color.useTextCC
-                end
-            },
-            hover = {
-                name = L['Hover'],
-                type = "color",
-                order = 3,
-                width = "double",
-                hasAlpha = true,
-                set = function(info, r, g, b, a)
-                    if self.db.profile.color.useHoverCC then
-                        r, g, b, _ = self:GetClassColors()
-                    end
-                    XIVBar:SetColor('hover', r, g, b, a)
-                end,
-                get = function() return XIVBar:GetColor('hover') end
-            },
-            hoverCC = {
-                name = L['Use Class Colors for Hover'],
-                type = "toggle",
-                order = 4,
-                set = function(_, val)
-                    if val then
-                        XIVBar:SetColor("hover", self:GetClassColors())
-                    end
-                    self.db.profile.color.useHoverCC = val;
-                    self:Refresh();
-                end,
-                get = function()
-                    return self.db.profile.color.useHoverCC
-                end
-            },
-            inactive = {
-                name = L['Inactive'],
-                type = "color",
-                order = 5,
-                hasAlpha = true,
-                width = "double",
-                set = function(info, r, g, b, a)
-                    XIVBar:SetColor('inactive', r, g, b, a)
-                end,
-                get = function()
-                    return XIVBar:GetColor('inactive')
-                end
-            }
-        }
-    }
+    return true
 end

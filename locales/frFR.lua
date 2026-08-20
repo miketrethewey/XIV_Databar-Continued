@@ -1,165 +1,372 @@
-local AddOnName, Engine = ...;
-local AceLocale = LibStub:GetLibrary("AceLocale-3.0");
-local L = AceLocale:NewLocale(AddOnName, "frFR", false, false);
+local AddOnName, _ = ...
+
+local AceLocale = LibStub:GetLibrary("AceLocale-3.0")
+---@class XIV_DatabarLocale : table<string, boolean|string>
+local L ---@type XIV_DatabarLocale
+L = AceLocale:NewLocale(AddOnName, "frFR", false, false)
 if not L then return end
 
-L['Modules'] = "Modules";
-L['Left-Click'] = "Clic gauche";
-L['Right-Click'] = "Clic droit";
-L['k'] = true; -- short for 1000
-L['M'] = "m"; -- short for 1000000
-L['B'] = "M"; -- short for 1000000000
-L['L'] = true; -- For the local ping
-L['W'] = "M"; -- For the world ping
+-- Reference:
+-- Some strings below are sourced from BlizzardInterfaceResources.
+-- Source: https://github.com/Ketho/BlizzardInterfaceResources/blob/live/Resources/GlobalStrings/frFR.lua
+-- @Translation Team: If you find a false positive (a string that should stay identical),
+-- add `-- @no-translate` at the end of the line so the locale sync script ignores it.
+
+L["MODULES"] = "Modules" -- @no-translate
+L["LEFT_CLICK"] = "Clic gauche"
+L["RIGHT_CLICK"] = "Clic droit"
+-- TODO: L["k"] = true -- short for 1000
+L["M"] = "m" -- short for 1000000
+L["B"] = "M" -- short for 1000000000
+-- TODO: L["L"] = true -- For the local ping
+L["W"] = "M" -- For the world ping
 
 -- General
-L["Positioning"] = "Positionnement";
-L['Bar Position'] = "Position de la barre";
-L['Top'] = "Haut";
-L['Bottom'] = "Bas";
-L['Bar Color'] = "Couleur de la barre";
-L['Use Class Color for Bar'] = "Utiliser la couleur de classe pour la barre";
-L["Miscellaneous"] = "Divers";
-L['Hide Bar in combat'] = "Cacher la barre en combat";
-L['Bar Padding'] = "Décalage de la barre";
-L['Module Spacing'] = "Espacement des modules";
-L['Bar Margin'] = "Marge des modules en bord d'écran";
-L["Leftmost and rightmost margin of the bar modules"] = "Décalage des modules en bord d'écran";
-L['Hide order hall bar'] = "Cacher la barre du hall de classe";
-L['Use ElvUI for tooltips'] = "Utiliser ElvUI pour les info-bulles";
+L["POSITIONING"] = "Positionnement"
+L["BAR_POSITION"] = "Position de la barre"
+L["TOP"] = "Haut"
+L["BOTTOM"] = "Bas"
+L["BAR_COLOR"] = "Couleur de la barre"
+L["USE_CLASS_COLOR"] = "Utiliser la couleur de classe pour la barre"
+L["MISCELLANEOUS"] = "Divers"
+L["HIDE_IN_COMBAT"] = "Cacher la barre en combat"
+L["HIDE_IN_FLIGHT"] = "Cacher la barre en vol"
+L["SHOW_ON_MOUSEOVER"] = "Afficher au survol"
+L["SHOW_ON_MOUSEOVER_DESC"] = "Afficher la barre uniquement au survol"
+L["BAR_PADDING"] = "Décalage de la barre"
+L["MODULE_SPACING"] = "Espacement des modules"
+L["BAR_MARGIN"] = "Marge des modules en bord d'écran"
+L["BAR_MARGIN_DESC"] = "Décalage des modules en bord d'écran"
+L["HIDE_ORDER_HALL_BAR"] = "Cacher la barre du hall de classe"
+L["USE_ELVUI_FOR_TOOLTIPS"] = "Utiliser ElvUI pour les info-bulles"
+L["LOCK_BAR"] = "Verrouiller la position de la barre"
+L["LOCK_BAR_DESC"] = "Verrouiller la barre pour empêcher le déplacement"
+L["BAR_FULLSCREEN_DESC"] = "La barre prend toute la largeur de l'écran"
+L["BAR_POSITION_DESC"] = "Positionne la barre en haut ou en bas de l'écran"
+L["X_OFFSET"] = "Décalage X"
+L["Y_OFFSET"] = "Décalage Y"
+L["HORIZONTAL_POSITION"] = "Position horizontale de la barre"
+L["VERTICAL_POSITION"] = "Position verticale de la barre"
+L["BEHAVIOR"] = "Comportement"
+L["SPACING"] = "Espacement"
+
+-- Modules Positioning
+L["MODULES_POSITIONING"] = "Positionnement des modules"
+L["ENABLE_FREE_PLACEMENT"] = "Activer le placement libre"
+L["ENABLE_FREE_PLACEMENT_DESC"] = "Activer un positionnement X indépendant pour chaque module et désactiver les ancres inter-modules"
+L["RESET_ALL_POSITIONS"] = "Réinitialiser toutes les positions"
+L["RESET_ALL_POSITIONS_DESC"] = "Remet tous les modules à leurs positions initiales en placement libre"
+L["ANCHOR_POINT"] = "Point d'ancrage"
+L["X_POSITION"] = "Position X"
+L["RESET_POSITION"] = "Réinitialiser la position"
+L["RESET_POSITION_DESC"] = "Remet le module à sa position en mode ancré"
+L["RECAPTURE_INITIAL_POSITIONS"] = "Recapturer les positions initiales"
+L["RECAPTURE_INITIAL_POSITIONS_DESC"] = "Capture les positions ancrées actuelles comme nouvelles positions initiales du placement libre"
 
 -- Positioning Options
-L['Positioning Options'] = "Options de positionnement";
-L['Horizontal Position'] = "Horizontal";
-L['Bar Width'] = "Longueur de la barre";
-L['Left'] = "Aligné à gauche";
-L['Center'] = "Centrer";
-L['Right'] = "Aligné à droite";
+L["BAR_WIDTH"] = "Longueur de la barre"
+L["LEFT"] = "Aligné à gauche"
+L["CENTER"] = "Centrer"
+L["RIGHT"] = "Aligné à droite"
 
 -- Media
-L['Font'] = "Police";
-L['Small Font Size'] = "Taille de la petite police";
-L['Text Style'] = "Style du texte";
+L["FONT"] = "Police"
+L["SMALL_FONT_SIZE"] = "Taille de la petite police"
+L["TEXT_STYLE"] = "Style du texte"
 
 -- Text Colors
-L["Colors"] = "Couleurs";
-L['Text Colors'] = "Couleurs du texte";
-L['Normal'] = "Normale";
-L['Use Class Color for Text'] = "Utiliser la couleur de classe pour le texte";
-L['Only the alpha can be set with the color picker'] = "Seul l'alpha peut être réglé avec la sélection de couleur";
-L['Inactive'] = "Inactif";
-L['Use Class Colors for Hover'] = "Utiliser la couleur de classe lors du survol";
-L['Hover'] = "Survol";
+L["COLORS"] = "Couleurs"
+L["TEXT_COLORS"] = "Couleurs du texte"
+L["NORMAL"] = "Normale"
+L["INACTIVE"] = "Inactif"
+L["USE_CLASS_COLOR_TEXT"] = "Utiliser la couleur de classe pour le texte"
+L["USE_CLASS_COLOR_TEXT_DESC"] = "Seul l'alpha peut être réglé avec la sélection de couleur"
+L["USE_CLASS_COLORS_FOR_HOVER"] = "Utiliser la couleur de classe lors du survol"
+L["HOVER"] = "Survol"
 
 -------------------- MODULES ---------------------------
 
-L['Micromenu'] = "Micro menu";
-L['Show Social Tooltips'] = "Montrer les bulles de contacts";
-L['Main Menu Icon Right Spacing'] = "Décalage à droite du micro menu";
-L['Icon Spacing'] = "Espacement des icônes";
-L["Hide BNet App Friends"] = "Masquer amis BNet applications";
-L['Open Guild Page'] = "Ouvrir la page de guilde";
-L['No Tag'] = "Aucun Tag";
-L['Whisper BNet'] = "Chuchoter BNet";
-L['Whisper Character'] = "Chuchoter le personnage";
-L['Hide Social Text'] = "Cacher le texte des contacts";
-L['Social Text Offset'] = "Décalage du texte social";
-L["GMOTD in Tooltip"] = "Afficher le message de guilde dans la bulle";
-L["Modifier for friend invite"] = "Touche modifieuse pour inviter un contact";
-L['Show/Hide Buttons'] = "Montrer/Cacher les boutons";
-L['Show Menu Button'] = "Montrer le bouton Menu";
-L['Show Chat Button'] = "Montrer le bouton Tchat";
-L['Show Guild Button'] = "Montrer le bouton Guilde";
-L['Show Social Button'] = "Montrer le bouton Contacts";
-L['Show Character Button'] = "Montrer le bouton Personnage";
-L['Show Spellbook Button'] = "Montrer le bouton Grimoire";
-L['Show Talents Button'] = "Montrer le bouton Talents";
-L['Show Achievements Button'] = "Montrer le bouton Haut-faits";
-L['Show Quests Button'] = "Montrer le bouton Quêtes";
-L['Show LFG Button'] = "Montrer le bouton RDG";
-L['Show Journal Button'] = "Montrer le bouton Journal";
-L['Show PVP Button'] = "Montrer le bouton PVP";
-L['Show Pets Button'] = "Montrer le bouton Mascottes";
-L['Show Shop Button'] = "Montrer le bouton Boutique";
-L['Show Help Button'] = "Montrer le bouton Aide";
-L['No Info'] = "Pas d'information";
-L['Classic'] = true;
-L['Alliance'] = true;
-L['Horde'] = true;
+L["MICROMENU"] = "Micro menu"
+L["SHOW_SOCIAL_TOOLTIPS"] = "Montrer les bulles de contacts"
+L["SHOW_ACCESSIBILITY_TOOLTIPS"] = "Montrer les bulles d'accessibilité"
+L["BLIZZARD_MICROMENU"] = "Micro menu Blizzard"
+L["DISABLE_BLIZZARD_MICROMENU"] = "Désactiver le micro menu Blizzard"
+L["KEEP_QUEUE_STATUS_ICON"] = "Garder l'icône de la file d'attente"
+L["BLIZZARD_MICROMENU_DISCLAIMER"] = "Cette option est désactivée car un gestionnaire de barres externe est détecté : %s."
+L["BLIZZARD_BAGS_BAR"] = "Barre des sacs Blizzard"
+L["DISABLE_BLIZZARD_BAGS_BAR"] = "Désactiver la barre des sacs Blizzard"
+L["BLIZZARD_BAGS_BAR_DISCLAIMER"] = "Cette option est désactivée car un gestionnaire de barres externe est détecté : %s."
+L["MAIN_MENU_ICON_RIGHT_SPACING"] = "Décalage à droite du micro menu"
+L["ICON_SPACING"] = "Espacement des icônes"
+L["HIDE_BNET_APP_FRIENDS"] = "Masquer amis BNet applications"
+L["OPEN_GUILD_PAGE"] = "Ouvrir la page de guilde"
+L["NO_TAG"] = "Aucun Tag"
+L["WHISPER_BNET"] = "Chuchoter BNet"
+L["WHISPER_CHARACTER"] = "Chuchoter le personnage"
+L["HIDE_SOCIAL_TEXT"] = "Cacher le texte des contacts"
+L["SOCIAL_TEXT_OFFSET"] = "Décalage du texte social"
+L["GMOTD_IN_TOOLTIP"] = "Afficher le message de guilde dans la bulle"
+L["FRIEND_INVITE_MODIFIER"] = "Touche modifieuse pour inviter un contact"
+L["SHOW_HIDE_BUTTONS"] = "Afficher/Cacher les boutons"
+L["SHOW_MENU_BUTTON"] = "Afficher le bouton Menu"
+L["SHOW_CHAT_BUTTON"] = "Afficher le bouton Tchat"
+L["SHOW_GUILD_BUTTON"] = "Afficher le bouton Guilde"
+L["SHOW_SOCIAL_BUTTON"] = "Afficher le bouton Contacts"
+L["SHOW_CHARACTER_BUTTON"] = "Afficher le bouton Personnage"
+L["SHOW_SPELLBOOK_BUTTON"] = "Afficher le bouton Grimoire"
+L["SHOW_PROFESSIONS_BUTTON"] = "Afficher le bouton Métiers"
+L["SHOW_TALENTS_BUTTON"] = "Afficher le bouton Talents"
+L["SHOW_ACHIEVEMENTS_BUTTON"] = "Afficher le bouton Haut-faits"
+L["SHOW_QUESTS_BUTTON"] = "Afficher le bouton Quêtes"
+L["SHOW_LFG_BUTTON"] = "Afficher le bouton RDG"
+L["SHOW_JOURNAL_BUTTON"] = "Afficher le bouton Journal"
+L["SHOW_PVP_BUTTON"] = "Afficher le bouton JcJ"
+L["SHOW_PETS_BUTTON"] = "Afficher le bouton Mascottes"
+L["SHOW_SHOP_BUTTON"] = "Afficher le bouton Boutique"
+L["SHOW_HELP_BUTTON"] = "Afficher le bouton Aide"
+L["SHOW_HOUSING_BUTTON"] = "Afficher le bouton Logis"
+L["NO_INFO"] = "Pas d'information"
+L["Alliance"] = FACTION_ALLIANCE
+L["Horde"] = FACTION_HORDE
+L["DISABLE_TOOLTIPS_IN_COMBAT"] = "Masquer les infobulles en combat"
 
-L['Durability Warning Threshold'] = "Seuil d'avertissement de durabilité";
-L['Show Item Level'] = "Afficher le niveau d'équipement";
-L['Show Coordinates'] = "Afficher les coordonnées";
+L["DURABILITY_WARNING_THRESHOLD"] = "Seuil d'avertissement de durabilité"
+L["SHOW_ITEM_LEVEL"] = "Afficher le niveau d'équipement"
+L["SHOW_COORDINATES"] = "Afficher les coordonnées"
+L["SET_EQUIPMENT_SET"] = "Choix de l'équipement"
+L["NO_EQUIPMENT_SETS"] = "Aucun ensemble d'équipement"
+L["CURRENT_EQUIPMENT_SET"] = "Ensemble d'équipement actif"
 
-L['Master Volume'] = "Volume principal";
-L["Volume step"] = "Incrément de volume";
+-- Master Volume
+L["MASTER_VOLUME"] = "Volume principal"
+L["VOLUME_STEP"] = "Incrément de volume"
+L["ENABLE_MOUSE_WHEEL"] = "Activer le réglage par molette"
+L["CURRENT_AUDIO_OUTPUT"] = "Sortie actuelle"
+L["SET_AUDIO_OUTPUT"] = "Choisir la sortie audio"
+L["NO_AUDIO_OUTPUT_DEVICES"] = "Aucun périphérique audio"
 
-L['Time Format'] = "Format de l'heure";
-L['Use Server Time'] = "Utiliser l'heure du serveur";
-L['New Event!'] = "Nouvel événement";
-L['Local Time'] = "Heure locale";
-L['Realm Time'] = "Heure du royaume";
-L['Open Calendar'] = "Ouvrir le calendrier";
-L['Open Clock'] = "Ouvrir l'horloge";
-L['Hide Event Text'] = "Cacher le texte d'événement";
+-- DataBrokers
+L["DATABROKERS"] = "DataBrokers"
+L["DATABROKERS_PLUGINS"] = "Plugins DataBroker"
+L["DATABROKERS_NONE_AVAILABLE"] = "Aucun plugin DataBroker détecté. Activez un addon LibDataBroker pour le voir ici."
+L["DATABROKERS_SHOW_ICON"] = "Afficher l'icône"
+L["DATABROKERS_ICON_SIZE"] = "Taille des icônes"
+L["DATABROKERS_SHOW_TEXT"] = "Afficher le texte"
+L["DATABROKERS_SHOW_DATA_SOURCES"] = "Afficher les Data Sources"
+L["DATABROKERS_SHOW_LAUNCHERS"] = "Afficher les Launchers"
+L["DATABROKERS_OTHER"] = "Autres"
 
-L['Travel'] = "Voyage";
-L['Port Options'] = "Options de téléportation";
-L['Ready'] = "Prêt";
-L['Travel Cooldowns'] = "Temps de recharge des voyages";
-L['Change Port Option'] = "Option de changement de la téléportation";
+-- Clock
+L["TIME_FORMAT"] = "Format de l'heure"
+L["USE_SERVER_TIME"] = "Utiliser l'heure du serveur"
+L["NEW_EVENT"] = "Nouvel événement"
+L["LOCAL_TIME"] = "Heure locale"
+L["REALM_TIME"] = "Heure du royaume"
+L["OPEN_CALENDAR"] = "Ouvrir le calendrier"
+L["OPEN_CLOCK"] = "Ouvrir l'horloge"
+L["HIDE_EVENT_TEXT"] = "Cacher le texte d'événement"
+L["CLOCK_SHOW_LOCKOUTS"] = "Afficher les verrouillages dans l'infobulle"
+L["CLOCK_SHOW_BOSSES_KILLED"] = "Afficher les boss vaincus"
+L["CLOCK_LOCKOUTS_HEADER"] = "Verrouillages"
+L["REST_ICON"] = "Icône de repos"
+L["SHOW_REST_ICON"] = "Afficher l'icône de repos"
+L["TEXTURE"] = "Texture" -- @no-translate
+L["DEFAULT"] = "Par défaut"
+L["CUSTOM"] = "Personnalisée"
+L["CUSTOM_TEXTURE"] = "Texture personnalisée"
+L["HIDE_REST_ICON_MAX_LEVEL"] = "Masquer au niveau maximum"
+L["TEXTURE_SIZE"] = "Taille de la texture"
+L["POSITION"] = "Position" -- @no-translate
+L["CUSTOM_TEXTURE_COLOR"] = "Couleur personnalisée"
+L["COLOR"] = "Couleur"
 
-L['Always Show Silver and Copper'] = "Toujours montrer l'argent et le cuivre";
-L['Shorten Gold'] = "Raccourcir le montant d'or";
-L['Toggle Bags'] = "Ouvrir/Fermer les sacs";
-L['Session Total'] = "Total sur la session";
-L['Daily Total'] = "Total quotidien";
-L['Gold rounded values'] = "Valeurs arrondies au po";
+L["TRAVEL"] = "Voyage"
+L["PORT_OPTIONS"] = "Options de téléportation"
+L["READY"] = "Prêt"
+L["TRAVEL_COOLDOWNS"] = "Temps de recharge des voyages"
+L["CHANGE_PORT_OPTION"] = "Option de changement de la téléportation"
 
-L['Show XP Bar Below Max Level'] = "Montrer la barre d'XP quand le niveau max n'est pas atteint";
-L['Use Class Colors for XP Bar'] = "Utiliser la couleur de classe pour la barre d'XP";
-L['Show Tooltips'] = "Montrer les bulles";
-L['Text on Right'] = "Texte à droite";
-L['Currency Select'] = "Sélection de la monnaie";
-L['First Currency'] = "Première monnaie";
-L['Second Currency'] = "Seconde monnaie";
-L['Third Currency'] = "Troisième monnaie";
-L['Rested'] = "Reposé";
+-- Gold
+L["REGISTERED_CHARACTERS"] = "Personnages enregistrés"
+L["SHOW_FREE_BAG_SPACE"] = "Montrer l'espace libre dans les sacs"
+L["SHOW_OTHER_REALMS"] = "Montrer les autres royaumes"
+L["ALWAYS_SHOW_SILVER_COPPER"] = "Toujours montrer l'argent et le cuivre"
+L["SHORTEN_GOLD"] = "Raccourcir le montant d'or"
+L["TOGGLE_BAGS"] = "Ouvrir/Fermer les sacs"
+L["SESSION_TOTAL"] = "Total sur la session"
+L["DAILY_TOTAL"] = "Total quotidien"
+L["SHOW_TOKEN_PRICE"] = "Afficher le prix d'un jeton"
+L["SHOW_WARBAND_BANK_GOLD"] = "Afficher l'or de la banque du bataillon"
+L["GOLD_ROUNDED_VALUES"] = "Valeurs arrondies à l'or"
+L["HIDE_CHAR_UNDER_THRESHOLD"] = "Masquer les personnages sous le seuil"
+L["HIDE_CHAR_UNDER_THRESHOLD_AMOUNT"] = "Seuil"
 
-L['Show World Ping'] = "Montrer la latence monde";
-L['Number of Addons To Show'] = "Nombre d'addon à lister";
-L['Addons to Show in Tooltip'] = "Addon à lister dans la bulle";
-L['Show All Addons in Tooltip with Shift'] = "Lister tous les addons avec Maj";
-L['Memory Usage'] = "Utilisation mémoire";
-L['Garbage Collect'] = "Nettoyer la mémoire";
-L['Cleaned'] = "Nettoyé";
+-- Currency
+L["SHOW_XP_BAR_BELOW_MAX_LEVEL"] = "Montrer la barre d'XP quand le niveau max n'est pas atteint"
+L["CLASS_COLORS_XP_BAR"] = "Utiliser la couleur de classe pour la barre d'XP"
+L["SHOW_TOOLTIPS"] = "Montrer les bulles"
+L["TEXT_ON_RIGHT"] = "Texte à droite"
+L["BAR_CURRENCY_SELECT"] = "Monnaies affichées sur la barre"
+L["FIRST_CURRENCY"] = "Première monnaie"
+L["SECOND_CURRENCY"] = "Seconde monnaie"
+L["THIRD_CURRENCY"] = "Troisième monnaie"
+L["RESTED"] = "Reposé"
+L["SHOW_MORE_CURRENCIES"] = "Montrer plus de monnaies avec Maj+Survol"
+L["MAX_CURRENCIES_SHOWN"] = "Nombre maximum de monnaies affichées avec Maj"
+L["ONLY_SHOW_MODULE_ICON"] = "Montrer uniquement l'icône du module"
+L["CURRENCY_NUMBER"] = "Nombre de monnaies dans la barre"
+L["CURRENCY_SELECTION"] = "Sélection des monnaies"
+L["SELECT_ALL"] = "Tout sélectionner"
+L["UNSELECT_ALL"] = "Tout désélectionner"
+L["OPEN_XIV_CURRENCY_OPTIONS"] = "Ouvrir les options de monnaie de XIV"
 
-L['Use Class Colors'] = "Utiliser les couleurs de classe";
-L['Cooldowns'] = "Temps de recharge";
-L['Toggle Profession Frame'] = 'Afficher le cadre de la profession';
-L['Toggle Profession Spellbook'] = 'afficher le livre de sorts de la profession';
+-- System
+L["WORLD_PING"] = "Montrer la latence monde"
+L["ADDONS_NUMBER_TO_SHOW"] = "Nombre d'addon à lister"
+L["ADDONS_IN_TOOLTIP"] = "Addon à lister dans la bulle"
+L["SHOW_ALL_ADDONS"] = "Lister tous les addons avec Maj"
+L["MEMORY_USAGE"] = "Utilisation mémoire"
+L["GARBAGE_COLLECT"] = "Nettoyer la mémoire"
+L["CLEANED"] = "Nettoyé"
 
-L['Set Specialization'] = "Choix de la spécialisation";
-L['Set Loadout'] = "Choix de la configuration";
-L['Set Loot Specialization'] = "Spécialisation du butin";
-L['Current Specialization'] = "Spécialisation actuelle";
-L['Current Loot Specialization'] = "Spécialisation du butin actuelle";
-L['Talent Minimum Width'] = "Longueur minimum";
-L['Open Artifact'] = "Ouvrir l'Arme Prodigieuse";
-L['Remaining'] = "Restant";
-L['Available Ranks'] = "Rangs disponibles";
-L['Artifact Knowledge'] = "Connaissance de l'arme prodigieuse";
+-- Reputation
+L["OPEN_REPUTATION"] = "Ouvrir l'interface de " .. REPUTATION
+L["PARAGON_REWARD_AVAILABLE"] = "Récompense de parangon disponible"
+L["CLASS_COLORS_REPUTATION"] = "Utiliser la couleur de classe pour la barre de réputation"
+L["REPUTATION_COLORS_REPUTATION"] = "Utiliser la couleur de réputation pour la barre de réputation"
+L["SHOW_LAST_REPUTATION_GAINED"] = "Toujours afficher la dernière réputation gagnée"
+L["FLASH_PARAGON_REWARD"] = "Flash lorsque la récompense de parangon est disponible"
+L["PROGRESS"] = "Progression"
+L["RANK"] = "Rang"
+L["PARAGON"] = "Parangon"
+
+-- Tradeskills
+L["USE_CLASS_COLORS"] = "Utiliser les couleurs de classe"
+L["USE_INTERACTIVE_TOOLTIP"] = "Utiliser l'infobulle interactive"
+L["COOLDOWNS"] = "Temps de recharge"
+L["TOGGLE_PROFESSION_FRAME"] = "Afficher l'interface de la profession"
+L["TOGGLE_PROFESSION_SPELLBOOK"] = "Afficher le livre de sorts de la profession"
+
+L["SET_SPECIALIZATION"] = "Choix de la spécialisation"
+L["SET_LOADOUT"] = "Choix de la configuration"
+L["SET_LOOT_SPECIALIZATION"] = "Spécialisation du butin"
+L["CURRENT_SPECIALIZATION"] = "Spécialisation actuelle"
+L["CURRENT_LOOT_SPECIALIZATION"] = "Spécialisation du butin actuelle"
+L["ENABLE_LOADOUT_SWITCHER"] = "Activer le changement de configuration"
+L["TALENT_MINIMUM_WIDTH"] = "Longueur minimum"
+L["OPEN_ARTIFACT"] = "Ouvrir l'Arme Prodigieuse"
+L["REMAINING"] = "Restant"
+L["KILLS_TO_LEVEL"] = "Monstres à tuer pour monter de niveau"
+L["LAST_XP_GAIN"] = "Dernier gain d'XP"
+L["AVAILABLE_RANKS"] = "Rangs disponibles"
+L["ARTIFACT_KNOWLEDGE"] = "Connaissance de l'arme prodigieuse"
+
+L["SHOW_BUTTON_TEXT"] = "Afficher le texte du bouton"
 
 -- Travel
-L['Use Random Hearthstone'] = "Utiliser une pierre de foyer aléatoire";
-L['Empty Hearthstones List'] = "Si vous voyez une liste vide, /reload votre interface afin de recharger les données quelques secondes après le chargement initial (Blizzard charge les informations des objets de manière asynchrone)."
-L['Hearthstones Select'] = "Sélection des pierres de foyers";
-L['Hearthstones Select Desc'] = "Sélectionner les pierres de foyers à utiliser (Attention, si vous sélectionnez plusieurs pierres de foyers, il faudrait cocher l'option 'Sélection des pierres de foyers')";
+L["HEARTHSTONE"] = "Pierre de foyer"
+L["M_PLUS_TELEPORTS"] = "Téléportations M+"
+L["ONLY_SHOW_CURRENT_SEASON"] = "N'afficher que les téléportations de la saison courante."
+L["MYTHIC_PLUS_TELEPORTS"] = "Téléportations Mythique+"
+L["HIDE_M_PLUS_TELEPORTS_TEXT"] = "Masquer le texte des téléportations M+"
+L["SHOW_SEASON_DATES"] = "Afficher les dates de saison"
+L["SEASON_DATE_RANGE"] = "Du %s au %s"
+L["SEASON_DATE_FROM"] = "À partir du %s"
+L["SHOW_MYTHIC_PLUS_TELEPORTS"] = "Montrer les téléportations Mythique+"
+L["MYTHIC_TELEPORT_SHARED_CD"] = "Temps de recharge partagé de 8 h (se réinitialise après avoir terminé un donjon Mythique+)"
+L["SHOW_MYTHIC_TELEPORT_POPUP"] = "Afficher le menu de téléportation"
+L["USE_RANDOM_HEARTHSTONE"] = "Utiliser une pierre de foyer aléatoire"
+local retrievingData = "Retrieving data..."
+L["RETRIEVING_DATA"] = retrievingData -- @no-translate
+L["EMPTY_HEARTHSTONES_LIST"] = "Si vous voyez '" .. retrievingData .. "' dans la liste ci-dessous, changez simplement d'onglet ou rouvrez ce menu pour rafraîchir les données."
+L["HEARTHSTONES_SELECT"] = "Sélection des pierres de foyers"
+L["HEARTHSTONES_SELECT_DESC"] = "Sélectionner les pierres de foyers à utiliser (Attention, si vous sélectionnez plusieurs pierres de foyers, il faudrait cocher l'option 'Sélection des pierres de foyers')"
+L["HIDE_HEARTHSTONE_BUTTON"] = "Masquer le bouton de la pierre de foyer"
+L["HIDE_PORT_BUTTON"] = "Masquer le bouton des téléportations secondaires"
+L["HIDE_HOME_BUTTON"] = "Masquer le bouton Logis"
+L["HIDE_HEARTHSTONE_TEXT"] = "Masquer le texte de la pierre de foyer"
+L["HIDE_PORT_TEXT"] = "Masquer le texte des téléportations secondaires"
+L["HIDE_ADDITIONAL_TOOLTIP_TEXT"] = "Masquer les textes additionnels de l'infobulle"
+L["HIDE_ADDITIONAL_TOOLTIP_TEXT_DESC"] = "Masquer le point de liaison de la pierre de foyer et le bouton de sélection des téléportations secondaires dans l'infobulle."
+L["NOT_LEARNED"] = "Non appris"
+L["SHOW_UNLEARNED_TELEPORTS"] = "Afficher les sorts de téléportation non appris"
+L["HIDE_BUTTON_DURING_OFF_SEASON"] = "Masquer le bouton pendant l’entre-saison"
+
+-- House/Home Selection
+L["HOME"] = "Logis"
+L["UNKNOWN_HOUSE"] = "Maison Inconnue"
+L["HOUSE"] = "Logis"
+L["PLOT"] = NEIGHBORHOOD_ROSTER_COLUMN_TITLE_PLOT -- @no-translate
+L["SELECTED"] = "Sélectionné"
+L["CHANGE_HOME"] = "Changer de Logis"
+L["NO_HOUSES_OWNED"] = "Aucun logis possédé"
+L["VISIT_SELECTED_HOME"] = "Visiter le logis sélectionné"
+
+L["CLASSIC"] = "Classic" -- @no-translate
+L["Burning Crusade"] = true
+L["Wrath of the Lich King"] = true
+L["Cataclysm"] = true
+L["Mists of Pandaria"] = true
+L["Warlords of Draenor"] = true
+L["Legion"] = true
+L["Battle for Azeroth"] = true
+L["Shadowlands"] = true
+L["Dragonflight"] = true
+L["The War Within"] = true
+L["Midnight"] = true
+L["CURRENT_SEASON"] = "Saison courante"
+L["NEXT_SEASON"] = "Prochaine saison"
+
+-- Profile Import/Export
+L["PROFILE_SHARING"] = "Partage de profil"
+
+L["INVALID_IMPORT_STRING"] = "Chaine d'import non valide"
+L["FAILED_DECODE_IMPORT_STRING"] = "Erreur de décodage de la chaine d'import"
+L["FAILED_DECOMPRESS_IMPORT_STRING"] = "Erreur de décompression de la chaine d'import"
+L["FAILED_DESERIALIZE_IMPORT_STRING"] = "Erreur de deserialization de la chaine d'import"
+L["INVALID_PROFILE_FORMAT"] = "Format de profil non valide"
+L["PROFILE_IMPORTED_SUCCESSFULLY_AS"] = "Profil importé avec succès sous le nom"
+
+L["COPY_EXPORT_STRING"] = "Copier la chaîne d'export ci-dessous:"
+L["PASTE_IMPORT_STRING"] = "Coller la chaîne d'import ci-dessous:"
+L["IMPORT_EXPORT_PROFILES_DESC"] = "Importez ou exportez vos profils pour les partager avec d'autres joueurs."
+L["PROFILE_IMPORT_EXPORT"] = "Import/Export de profil"
+L["EXPORT_PROFILE"] = "Exporter le profil"
+L["EXPORT_PROFILE_DESC"] = "Exporter les paramètres du profil actuel"
+L["IMPORT_PROFILE"] = "Importer un profil"
+L["IMPORT_PROFILE_DESC"] = "Importer un profil d'un autre joueur"
+
+L["PROFILE_SETUP_HEADER"] = "XIV_Databar Continued"
+L["PROFILE_SETUP_TEXT"] = "Le système de profils a été migré : ce personnage utilise encore l'ancien profil partagé Default.\n\nChoisissez comment ce personnage doit continuer :\n- |cffffd100Garder le profil actuel :|r rester sur le profil partagé Default (recommandé)\n- |cffffd100Copier le profil partagé :|r profil personnel basé sur vos réglages partagés actuels\n- |cffffd100Créer un profil vide :|r profil personnel avec les réglages par défaut (réinitialise ce personnage)\n\nVous pourrez aussi gérer les profils plus tard dans les paramètres Profiles."
+L["PROFILE_SETUP_CURRENT"] = "Profil actuel : %s"
+L["PROFILE_SETUP_NEW_BLANK"] = "Créer un profil vide"
+L["PROFILE_SETUP_NEW_FROM_SHARED"] = "Copier le profil partagé"
+L["PROFILE_SETUP_KEEP_CURRENT"] = "Garder le profil actuel"
+L["PROFILE_NEWCHAR_TEXT"] = "Ce personnage démarre avec un profil personnel vide.\n\n- |cffffd100Garder le profil actuel :|r garder le profil personnel vide de ce personnage\n- |cffffd100Utiliser le profil partagé :|r rejoindre le profil Default (réglages synchronisés)\n\nVous pourrez changer ça plus tard dans les paramètres Profiles."
+L["PROFILE_NEWCHAR_USE_SHARED"] = "Utiliser le profil partagé"
+
+L["DISABLE_LOGIN_MESSAGE"] = "Désactiver le message de connexion"
+L["ADDON_LOADED_MSG"] = "chargé, tapez /xivc pour ouvrir les options."
+L["UPDATE_ANNOUNCE"] = "a été mis à jour vers %s,"
+L["OPEN_CHANGELOG"] = "Ouvrir les notes de mise à jour"
+L["CHANGELOG_AFTER_COMBAT"] = "Les notes de mise à jour s'ouvriront après le combat"
 
 -- Changelog
-L["%month%-%day%-%year%"] = "%month%-%day%-%year%";
-L["Version"] = true;
-L["Important"] = true;
-L["New"] = "Nouveau";
-L["Improvment"] = "Améliorations";
-L["Changelog"] = "Historique de modifications";
+L["IMPORTANT"] = "Important" -- @no-translate
+L["NEW"] = "Nouveau"
+L["IMPROVEMENT"] = "Améliorations"
+L["BUGFIX"] = "Corrections de bugs"
+L["CHANGELOG"] = "Historique de modifications"
+
+-- Vault Module
+L["GREAT_VAULT_DISABLED"] = "La grande chambre forte est actuellement désactivée jusqu'au début de la prochaine saison."
+L["MAX_LEVEL_DISCLAIMER"] = "Ce module ne s'affichera que lorsque vous atteindrez le niveau maximum."
+L["VAULT_ALERT_COLOR"] = "Couleur de l'alerte"
+L["VAULT_ENABLE_REWARD_ALERT"] = "Activer l'alerte de récompense disponible"
+L["VAULT_FLASH_ALERT"] = "Faire pulser la récompense en attente"
+L["VAULT_FLASH_INTERVAL"] = "Intervalle de pulsation"
+L["VAULT_REWARD_ALERTS"] = "Alerte de récompense"
+L["VAULT_SNOOZE_CHAT"] = "Afficher un message de confirmation dans le chat"
+L["VAULT_SNOOZE_CHAT_MESSAGE"] = "Pulsation de l'alerte de la chambre forte mise en pause pendant %s."
+L["VAULT_SNOOZE_FLASH"] = "Mettre la pulsation en pause"
+L["VAULT_SNOOZE_MINUTES"] = "Durée de pause de la pulsation (minutes)"
